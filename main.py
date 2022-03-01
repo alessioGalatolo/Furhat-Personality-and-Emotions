@@ -1,67 +1,46 @@
 from furhat_remote_api import FurhatRemoteAPI
+from emotions import EmotionGenerator
 
-# FURHAT_ADDRESS = "MSI.local"
-FURHAT_ADDRESS = "localhost"
 
-# Create an instance of the FurhatRemoteAPI class, providing the address of the robot or the SDK running the virtual robot
-furhat = FurhatRemoteAPI(FURHAT_ADDRESS)
+def main():
+    # FURHAT_ADDRESS = "MSI.local"
+    FURHAT_ADDRESS = "localhost"  # FIXME: replace with furhat ip
 
-# Get the voices on the robot
-voices = furhat.get_voices()
+    furhat = FurhatRemoteAPI(FURHAT_ADDRESS)
 
-# Set the voice of the robot
-furhat.set_voice(name='Matthew')
+    # Get the voices on the robot
+    voices = furhat.get_voices()
 
-# Say "Hi there!"
-furhat.say(text="Hi there!")
+    # Set the voice of the robot
+    furhat.set_voice(name='Matthew')
 
-# Play an audio file (with lipsync automatically added)
-furhat.say(url="https://www2.cs.uic.edu/~i101/SoundFiles/gettysburg10.wav", lipsync=True)
+    # Say "Hi there!"
+    furhat.say(text="Hi there!")
 
-# Listen to user speech and return ASR result
-# result = furhat.listen()
+    # Play an audio file (with lipsync automatically added)
+    furhat.say(url="https://www2.cs.uic.edu/~i101/SoundFiles/gettysburg10.wav", lipsync=True)
 
-# Perform a named gesture
-furhat.gesture(name="BrowRaise")
-#EXPR_ANGER
-    # EXPR_DISGUST
-    # EXPR_FEAR
-    # EXPR_SAD
+    # Listen to user speech and return ASR result
+    # result = furhat.listen()
 
-# Perform a custom gesture
-furhat.gesture(body={
-    "frames": [
-        {
-            "time": [
-                0.33
-            ],
-            "params": {
-                "BLINK_LEFT": 1.0
-            }
-        },
-        {
-            "time": [
-                0.67
-            ],
-            "params": {
-                "reset": True
-            }
-        }
-    ],
-    "class": "furhatos.gestures.Gesture"
-    })
+    # Perform a named gesture
+    furhat.gesture(name="BrowRaise")
 
-# Get the users detected by the robot
-users = furhat.get_users()
+    # Get the users detected by the robot
+    users = furhat.get_users()
 
-# Attend the user closest to the robot
-furhat.attend(user="CLOSEST")
+    # Attend the user closest to the robot
+    furhat.attend(user="CLOSEST")
 
-# Attend a user with a specific id
-furhat.attend(userid="virtual-user-1")
+    # Attend a user with a specific id
+    furhat.attend(userid="virtual-user-1")
 
-# Attend a specific location (x,y,z)
-furhat.attend(location="0.0,0.2,1.0")
+    # Attend a specific location (x,y,z)
+    furhat.attend(location="0.0,0.2,1.0")
 
-# Set the LED lights
-furhat.set_led(red=50, green=200, blue=50)
+    # Set the LED lights
+    furhat.set_led(red=50, green=200, blue=50)
+
+
+if __name__ == "__main__":
+    main()
