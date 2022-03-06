@@ -13,12 +13,13 @@
 # limitations under the License.
 """Downloads data.
 """
+import argparse
+from os import mkdir, path, rename
 import texar.tf as tx
+import pandas as pd
 
-# pylint: disable=invalid-name
 
-
-def prepare_data():
+def prepare_yelp():
     """Downloads data.
     """
     tx.data.maybe_download(
@@ -27,12 +28,74 @@ def prepare_data():
         path='./',
         filenames='yelp.zip',
         extract=True)
+    rename(r"./yelp/sentiment.*", r"./yelp/*")
+
+
+def prepare_ear():
+    ...
+
+
+def prepare_essays(base_path, text_file, label_file, vocab_file):
+    with open(f"{base_path}/essays.csv", "r") as essays:
+        data = pd.read_csv(essays)
+    data['text'].to_csv(text_file, index=False)
+    traits_labels = ['cOPN', 'cCON', 'cEXT', 'cAGR', 'cNEU']
+    numerical_traits = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
+    numerical_traits.to_csv(label_file, index=False, header=['O', 'C', 'E', 'A', 'N'])
+    with open(vocab_file, "w+") as vocab:
+        vocab.writelines(tx.data.make_vocab(text_file))
+
+
+def prepare_mbti():
+    ...
+
+
+def prepare_personage_data():
+    ...
+
+
+def prepare_personality_detection():
+    ...
 
 
 def main():
     """Entrypoint.
     """
-    prepare_data()
+    DATASET2FUN = {'ear': prepare_ear,
+                   'essays': prepare_essays,
+                   'mbti': prepare_mbti,
+                   'personage-data': prepare_personage_data,
+                   'personality-detection': prepare_personality_detection,
+                   'yelp': prepare_yelp}
+    parser = argparse.ArgumentParser(description='Dataset downloader and preprocessor')
+    parser.add_argument('--dataset',
+                        default='yelp',
+                        choices=list(DATASET2FUN.keys()),
+                        help='name of the dataset to download or preprocess')
+    parser.add_argument('--base-path',
+                        help='base path for the dataset dir',
+                        default='./personality_transfer_model/data')
+    args = parser.parse_args()
+
+    store_path = path.join(args.base_path, "original_datasets", args.dataset)
+    if not path.exists(store_path):
+        # TODO: add download of dataset
+        print("Starting download of dataset")
+        raise NotImplementedError()
+    else:
+        if not path.isdir(store_path):
+            raise IOError("The path where the dataset should be store already exists and it's a file, not a folder.")
+        store_processed_path = path.join(args.base_path, args.dataset)
+        print("Starting preprocessing of dataset")
+        if path.exists(store_processed_path) and path.isdir(store_processed_path):
+            print("Dataset has already been processed, a probably unwanted behavior will follow...")
+        else:
+            mkdir(store_processed_path)
+        DATASET2FUN[args.dataset](store_path,
+                                  f"{store_processed_path}/text.csv",
+                                  f"{store_processed_path}/labels.csv",
+                                  f"{store_processed_path}/vocab")
+        print("Dataset preprocessed correctly")
 
 
 if __name__ == '__main__':
