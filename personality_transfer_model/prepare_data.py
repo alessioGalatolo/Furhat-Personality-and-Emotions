@@ -15,8 +15,6 @@
 """
 import argparse
 from collections import defaultdict
-from email.policy import default
-import urllib.request
 from os import makedirs, mkdir, path, rename, listdir
 import texar.tf as tx
 import pandas as pd
