@@ -14,20 +14,18 @@
 """Downloads data.
 """
 import argparse
-from os import mkdir, path, rename
+from collections import defaultdict
+from email.policy import default
+import urllib.request
+from os import makedirs, mkdir, path, rename, listdir
 import texar.tf as tx
 import pandas as pd
+from tqdm import tqdm
 
 
 def prepare_yelp():
     """Downloads data.
     """
-    tx.data.maybe_download(
-        urls='https://drive.google.com/file/d/'
-             '1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing',
-        path='./',
-        filenames='yelp.zip',
-        extract=True)
     rename(r"./yelp/sentiment.*", r"./yelp/*")
 
 
@@ -35,15 +33,26 @@ def prepare_ear():
     ...
 
 
-def prepare_essays(base_path, text_file, label_file, vocab_file):
-    with open(f"{base_path}/essays.csv", "r") as essays:
-        data = pd.read_csv(essays)
-    data['text'].to_csv(text_file, index=False)
+def prepare_essays(base_path, text_file, label_file, vocab_file, expand_essays=True):
     traits_labels = ['cOPN', 'cCON', 'cEXT', 'cAGR', 'cNEU']
+    with open(f"{base_path}/essays", "r") as essays:
+        data = pd.read_csv(essays)
+    if expand_essays:
+        print('Expanding the essays into single sentences, this will probably take a long time...')
+        unexpanded_data = data
+        data = pd.DataFrame()
+        for row in tqdm(unexpanded_data.iterrows(), total=unexpanded_data.shape[0]):
+            row_data = {trait: row[1][trait] for trait in traits_labels}
+            for sentence in row[1]['text'].split('.'):
+                row_data['text'] = str(sentence).replace('"', "")
+                data = data.append(row_data, ignore_index=True)
+    data['text'].to_csv(text_file, index=False, header=False)
     numerical_traits = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
-    numerical_traits.to_csv(label_file, index=False, header=['O', 'C', 'E', 'A', 'N'])
+    for trait in traits_labels:
+        numerical_traits[trait].to_csv(f'{label_file}_{trait[1:4]}',
+                                       index=False, header=False)
     with open(vocab_file, "w+") as vocab:
-        vocab.writelines(tx.data.make_vocab(text_file))
+        vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
 def prepare_mbti():
@@ -66,7 +75,16 @@ def main():
                    'mbti': prepare_mbti,
                    'personage-data': prepare_personage_data,
                    'personality-detection': prepare_personality_detection,
-                   'yelp': prepare_yelp}
+                   'yelp': prepare_yelp}  # FIXME: remove yelp, only used for debugging
+    DATASET2LINK = {'ear': ...,  # TODO
+                    'essays': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/essays/essays.csv?raw=true",
+                    'mbti': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/kaggle/kaggle.csv?raw=true",
+                    'personage-data': "http://farm2.user.srcf.net/research/personage/personage-data.tar.gz",
+                    'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv",
+                    'yelp': "https://drive.google.com/file/d/'1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing"}
+    DOWNLOAD_IS_COMPRESSED = defaultdict(lambda: False,
+                                         [('yelp', True), ('personage-data', True)])
+
     parser = argparse.ArgumentParser(description='Dataset downloader and preprocessor')
     parser.add_argument('--dataset',
                         default='yelp',
@@ -79,23 +97,29 @@ def main():
 
     store_path = path.join(args.base_path, "original_datasets", args.dataset)
     if not path.exists(store_path):
-        # TODO: add download of dataset
+        print("Creating destination folder for the dataset")
+        makedirs(store_path)
+    if not listdir(store_path):
         print("Starting download of dataset")
-        raise NotImplementedError()
+        tx.data.maybe_download(
+            urls=DATASET2LINK[args.dataset],
+            path=store_path,
+            filenames=args.dataset,
+            extract=DOWNLOAD_IS_COMPRESSED[args.dataset])
+        # TODO: add remove of zip if dataset is compressed
+    if not path.isdir(store_path):
+        raise IOError("The path where the dataset should be store already exists and it's a file, not a folder.")
+    store_processed_path = path.join(args.base_path, args.dataset)
+    print("Starting preprocessing of dataset")
+    if path.exists(store_processed_path) and path.isdir(store_processed_path):
+        print("Dataset has already been processed, a probably unwanted behavior will follow...")
     else:
-        if not path.isdir(store_path):
-            raise IOError("The path where the dataset should be store already exists and it's a file, not a folder.")
-        store_processed_path = path.join(args.base_path, args.dataset)
-        print("Starting preprocessing of dataset")
-        if path.exists(store_processed_path) and path.isdir(store_processed_path):
-            print("Dataset has already been processed, a probably unwanted behavior will follow...")
-        else:
-            mkdir(store_processed_path)
-        DATASET2FUN[args.dataset](store_path,
-                                  f"{store_processed_path}/text.csv",
-                                  f"{store_processed_path}/labels.csv",
-                                  f"{store_processed_path}/vocab")
-        print("Dataset preprocessed correctly")
+        mkdir(store_processed_path)
+    DATASET2FUN[args.dataset](store_path,
+                              f"{store_processed_path}/text",
+                              f"{store_processed_path}/labels",
+                              f"{store_processed_path}/vocab")
+    print("Dataset preprocessed correctly")
 
 
 if __name__ == '__main__':
