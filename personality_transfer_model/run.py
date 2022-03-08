@@ -40,6 +40,7 @@ from ctrl_gen_model import CtrlGenModel
 flags = tf.flags
 
 flags.DEFINE_string('config', 'config', 'The config to use.')
+flags.DEFINE_string('dataset', default=None, help='The dataset to use.', required=True)
 
 FLAGS = flags.FLAGS
 
@@ -48,17 +49,16 @@ config = importlib.import_module(FLAGS.config)
 
 def _main(_):
     # Data
-    train_data = tx.data.MultiAlignedData(config.train_data)
-    val_data = tx.data.MultiAlignedData(config.val_data)
-    test_data = tx.data.MultiAlignedData(config.test_data)
+    train_data = tx.data.MultiAlignedData(config.train_data(FLAGS.dataset))
+    # val_data = tx.data.MultiAlignedData(config.val_data)
+    # test_data = tx.data.MultiAlignedData(config.test_data)
     vocab = train_data.vocab(0)
 
     # Each training batch is used twice: once for updating the generator and
     # once for updating the discriminator. Feedable data iterator is used for
     # such case.
     iterator = tx.data.FeedableDataIterator(
-        {'train_g': train_data, 'train_d': train_data,
-         'val': val_data, 'test': test_data})
+        {'train_g': train_data, 'train_d': train_data})
     batch = iterator.get_next()
 
     # Model
@@ -175,15 +175,15 @@ def _main(_):
             _train_epoch(sess, gamma_, lambda_g_, epoch)
 
             # Val
-            iterator.restart_dataset(sess, 'val')
-            _eval_epoch(sess, gamma_, lambda_g_, epoch, 'val')
+            # iterator.restart_dataset(sess, 'val')
+            # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'val')
 
             saver.save(
                 sess, os.path.join(config.checkpoint_path, 'ckpt'), epoch)
 
-            # Test
-            iterator.restart_dataset(sess, 'test')
-            _eval_epoch(sess, gamma_, lambda_g_, epoch, 'test')
+            # # Test
+            # iterator.restart_dataset(sess, 'test')
+            # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'test')
 
 
 if __name__ == '__main__':

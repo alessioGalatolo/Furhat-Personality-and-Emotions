@@ -20,31 +20,34 @@ restore = ''   # Model snapshot to restore from
 lambda_g = 0.1  # Weight of the classification loss
 gamma_decay = 0.5  # Gumbel-softmax temperature anneal rate
 
-train_data = {
-    'batch_size': 64,
-    # 'seed': 123,
-    'datasets': [
-        {
-            'files': './data/yelp/sentiment.train.text',
-            'vocab_file': './data/yelp/vocab',
-            'data_name': ''
-        },
-        {
-            'files': './data/yelp/sentiment.train.labels',
-            'data_type': 'int',
-            'data_name': 'labels'
-        }
-    ],
-    'name': 'train'
-}
 
-val_data = copy.deepcopy(train_data)
-val_data['datasets'][0]['files'] = './data/yelp/sentiment.dev.text'
-val_data['datasets'][1]['files'] = './data/yelp/sentiment.dev.labels'
+def train_data(dataset):
+    return {
+        'batch_size': 64,
+        # 'seed': 123,
+        'datasets': [
+            {
+                'files': f'./personality_transfer_model/data/{dataset}/text',
+                'vocab_file': f'./personality_transfer_model/data/{dataset}/vocab',
+                'data_name': ''
+            },
+            {
+                'files': f'./personality_transfer_model/data/{dataset}/labels_EXT',
+                'data_name': 'labels',
+                'data_type': 'int'
+            }
+        ],
+        'name': 'train'
+    }
 
-test_data = copy.deepcopy(train_data)
-test_data['datasets'][0]['files'] = './data/yelp/sentiment.test.text'
-test_data['datasets'][1]['files'] = './data/yelp/sentiment.test.labels'
+# val_data = copy.deepcopy(train_data)
+# val_data['datasets'][0]['files'] = './data/yelp/sentiment.dev.text'
+# val_data['datasets'][1]['files'] = './data/yelp/sentiment.dev.labels'
+
+# test_data = copy.deepcopy(train_data)
+# test_data['datasets'][0]['files'] = './data/yelp/sentiment.test.text'
+# test_data['datasets'][1]['files'] = './data/yelp/sentiment.test.labels'
+
 
 model = {
     'dim_c': 200,
