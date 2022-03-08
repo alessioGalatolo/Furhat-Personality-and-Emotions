@@ -16,12 +16,13 @@
 import argparse
 from collections import defaultdict
 from os import makedirs, mkdir, path, rename, listdir
+from re import findall
 import texar.tf as tx
 import pandas as pd
 from tqdm import tqdm
 
 
-def prepare_yelp():
+def prepare_yelp(**kwargs):
     """Downloads data.
     """
     rename(r"./yelp/sentiment.*", r"./yelp/*")
@@ -39,12 +40,16 @@ def prepare_essays(base_path, text_file, label_file, vocab_file, expand_essays=T
         print('Expanding the essays into single sentences, this will probably take a long time...')
         unexpanded_data = data
         data = pd.DataFrame()
-        for row in tqdm(unexpanded_data.iterrows(), total=unexpanded_data.shape[0]):
-            row_data = {trait: row[1][trait] for trait in traits_labels}
-            for sentence in row[1]['text'].split('.'):
-                row_data['text'] = str(sentence).replace('"', "")
-                data = data.append(row_data, ignore_index=True)
-    data['text'].to_csv(text_file, index=False, header=False)
+        with open(text_file, "w+") as text:
+            for row in tqdm(unexpanded_data.iterrows(), total=unexpanded_data.shape[0]):
+                row_data = {trait: row[1][trait] for trait in traits_labels}
+                for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
+                    for match in sentence:
+                        if match:
+                            text.write(match + "\n")
+                    data = data.append(row_data, ignore_index=True)
+    else:
+        data['text'].to_csv(text_file, index=False, header=False)
     numerical_traits = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
     for trait in traits_labels:
         numerical_traits[trait].to_csv(f'{label_file}_{trait[1:4]}',
