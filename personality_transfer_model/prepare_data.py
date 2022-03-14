@@ -46,7 +46,7 @@ def prepare_essays(base_path, text_file, label_file, vocab_file, expand_essays=T
                 for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
                     for match in sentence:
                         if match:
-                            text.write(match + "\n")
+                            text.write(match.replace(".", " .").replace("!", " !").replace("?", " ?").strip() + "\n")
                     data = data.append(row_data, ignore_index=True)
     else:
         data['text'].to_csv(text_file, index=False, header=False)
