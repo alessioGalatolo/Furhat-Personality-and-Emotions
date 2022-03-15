@@ -24,7 +24,7 @@ gamma_decay = 0.5  # Gumbel-softmax temperature anneal rate
 def train_data(dataset):
     return {
         'batch_size': 64,
-        # 'seed': 123,
+        'seed': 123,
         'datasets': [
             {
                 'files': f'./personality_transfer_model/data/{dataset}/text',

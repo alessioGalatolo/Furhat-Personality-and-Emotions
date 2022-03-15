@@ -17,9 +17,13 @@ import argparse
 from collections import defaultdict
 from os import makedirs, mkdir, path, rename, listdir
 from re import findall
-import texar.tf as tx
 import pandas as pd
 from tqdm import tqdm
+
+try:
+    import texar.torch as tx
+except ImportError:
+    import texar.tf as tx
 
 
 def prepare_yelp(**kwargs):

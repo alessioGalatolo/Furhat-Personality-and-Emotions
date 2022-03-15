@@ -4,3 +4,4 @@ tensorflow-gpu==1.15.0
 tensorflow-probability==0.7.0
 texar==0.2.4
 tqdm==4.63.0
+torch>=1.9.0

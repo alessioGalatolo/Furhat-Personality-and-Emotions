@@ -8,7 +8,7 @@ from texar.torch.modules import WordEmbedder, UnidirectionalRNNEncoder, \
 
 
 class CtrlGenModel(nn.Module):
-    def __init__(self, inputs, vocab, gamma, lambda_g, hparams):
+    def __init__(self, input_len, vocab, gamma, lambda_g, hparams):
         super().__init__()
         self._hparams = tx.HParams(hparams, None)
         self.vocab = vocab
@@ -17,10 +17,11 @@ class CtrlGenModel(nn.Module):
         self.embedder = WordEmbedder(
             vocab_size=vocab.size,
             hparams=self._hparams.embedder)
-        self.encoder = UnidirectionalRNNEncoder(input_size=self._hparams.embedder.dim, hparams=self._hparams.encoder)
+        self.encoder = UnidirectionalRNNEncoder(input_size=self.embedder.dim, hparams=self._hparams.encoder)
 
         # Encodes label
-        self.label_connector = MLPTransformConnector(self._hparams.dim_c, 1)  # FIXME
+        self.label_connector = MLPTransformConnector(self._hparams.dim_c,
+                                                     linear_layer_dim=1)
 
         # Teacher-force decoding and the auto-encoding loss for G
         self.decoder = AttentionRNNDecoder(
@@ -42,9 +43,10 @@ class CtrlGenModel(nn.Module):
             classifier_hp = self._hparams.todict()['classifier']
             filters = classifier_hp.pop('filters')
             classifier_hp['out_channels'] = filters
+            classifier_hp['data_format'] = 'channels_last'
 
-        self.classifier = Conv1DClassifier(in_channels=inputs['text_ids'].size(1)-1,
-                                           in_features=self._hparams.embedder.dim,
+        self.classifier = Conv1DClassifier(in_features=input_len,
+                                           in_channels=self.embedder.dim,
                                            hparams=classifier_hp)
 
     def g_params(self):

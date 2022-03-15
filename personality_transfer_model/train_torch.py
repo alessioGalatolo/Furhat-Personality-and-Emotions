@@ -97,7 +97,7 @@ def main():
     # Model
     gamma = config.gamma_decay
     lambda_g = config.lambda_g
-    model = CtrlGenModel(batch, vocab, gamma, lambda_g, config.model).to(device)
+    model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab, gamma, lambda_g, config.model).to(device)
 
     os.makedirs(config.sample_path, exist_ok=True)
     os.makedirs(config.checkpoint_path, exist_ok=True)
