@@ -51,7 +51,8 @@ class CtrlGenModel(nn.Module):
                                            hparams=classifier_hp).to(device)
 
     def g_params(self):
-        g_ = [self.embedder, self.encoder, self.label_connector,
+        # do not include embedder since its parameters are present in the decoder
+        g_ = [self.encoder, self.label_connector,
               self.connector, self.decoder]
         params = []
         for model in g_:
