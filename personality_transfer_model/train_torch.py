@@ -78,8 +78,15 @@ def main():
     parser.add_argument('--dataset',
                         help='The name of the dataset to use.',
                         required=True)
+    parser.add_argument('--load-checkpoint',
+                        help='Whether to start again from the last checkpoint',
+                        action='store_true')
     args = parser.parse_args()
     config = importlib.import_module(args.config)
+    checkpoint_path = os.path.join(config.checkpoint_path, 'ckpt.pth')
+
+    os.makedirs(config.sample_path, exist_ok=True)
+    os.makedirs(config.checkpoint_path, exist_ok=True)
 
     # Data
     train_data = tx.data.MultiAlignedData(config.train_data(args.dataset),
@@ -101,13 +108,12 @@ def main():
     model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab, gamma, lambda_g,
                          config.model, device).to(device)
 
-    os.makedirs(config.sample_path, exist_ok=True)
-    os.makedirs(config.checkpoint_path, exist_ok=True)
-
-    # saver = tf.train.Saver(max_to_keep=None)
-    # if config.restore:
-    #     print('Restore from: {}'.format(config.restore))
-    #     saver.restore(sess, config.restore)
+    initial_epoch = 1
+    if args.load_checkpoint:
+        print(f'Restoring checkpoint from {checkpoint_path}')
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        initial_epoch = checkpoint['epoch']
 
     gamma_ = 1.
     lambda_g_ = 0.
@@ -122,7 +128,9 @@ def main():
     train_g = tx.core.get_train_op(model.g_params(), hparams=opt_hp)
     train_g_ae = tx.core.get_train_op(model.g_params(), hparams=opt_hp)
     train_d = tx.core.get_train_op(model.d_params(), hparams=opt_hp)
-    for epoch in range(1, config.max_nepochs + 1):
+
+    print(f'Starting training from epoch {initial_epoch}')
+    for epoch in range(initial_epoch, config.max_nepochs + 1):
         if epoch > config.pretrain_nepochs:
             # Anneals the gumbel-softmax temperature
             gamma_ = max(0.001, gamma_ * gamma)
@@ -144,8 +152,9 @@ def main():
             loss_g.backward()
             train_g()
 
-        torch.save({'model_state_dict': model.state_dict()},
-                   os.path.join(config.checkpoint_path, 'ckpt.pth'))
+        torch.save({'model_state_dict': model.state_dict(),
+                    'epoch': epoch},
+                   checkpoint_path)
         # Val
         # iterator.restart_dataset(sess, 'val')
         # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'val')
