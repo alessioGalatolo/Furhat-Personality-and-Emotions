@@ -76,7 +76,7 @@ class CtrlGenModel(nn.Module):
         # loss_d_clas = tf.reduce_mean(loss_d_clas) FIXME
         accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
 
-        return loss_d_clas
+        return loss_d_clas, None
 
     def forward_g(self, inputs):
         # text_ids for encoder, with BOS token removed
