@@ -120,28 +120,31 @@ def main():
     model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab,
                          config.model, device).to(device)
 
+    optim_g = tx.core.get_optimizer(model.g_params(),
+                                    hparams=model._hparams.opt)
+    optim_d = tx.core.get_optimizer(model.d_params(),
+                                    hparams=model._hparams.opt)
+    train_g = tx.core.get_train_op(optim_g)
+    train_d = tx.core.get_train_op(optim_d)
+
     initial_epoch = 1
     if args.load_checkpoint:
         print(f'Restoring checkpoint from {checkpoint_path}')
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
+        optim_g.load_state_dict(checkpoint['optim_g'])
+        optim_d.load_state_dict(checkpoint['optim_d'])
         initial_epoch = checkpoint['epoch']
 
-    gamma = 1.
+    gamma_0 = 1.
     lambda_g = 0.
-
-    train_g = tx.core.get_train_op(model.g_params(),
-                                   hparams=model._hparams.opt)
-    train_d = tx.core.get_train_op(model.d_params(),
-                                   hparams=model._hparams.opt)
 
     print(f'Starting training from epoch {initial_epoch}')
     for epoch in range(initial_epoch, config.max_nepochs + 1):
-        if epoch == config.pretrain_nepochs+1:
-            lambda_g = config.lambda_g
         if epoch > config.pretrain_nepochs:
             # Anneals the gumbel-softmax temperature
-            gamma = max(0.001, gamma * gamma_decay)
+            gamma = max(0.001, gamma_0 * (gamma_decay ** (epoch-config.pretrain_nepochs)))
+            lambda_g = config.lambda_g
         print('gamma: {}, lambda_g: {}'.format(gamma, lambda_g))
 
         # Train
@@ -160,6 +163,8 @@ def main():
             train_g()
 
         torch.save({'model_state_dict': model.state_dict(),
+                    'optim_d': optim_d.state_dict(),
+                    'optim_g': optim_g.state_dict(),
                     'epoch': epoch},
                    checkpoint_path)
         # Val
