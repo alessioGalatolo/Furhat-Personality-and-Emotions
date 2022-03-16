@@ -8,12 +8,10 @@ from texar.torch.modules import WordEmbedder, UnidirectionalRNNEncoder, \
 
 
 class CtrlGenModel(nn.Module):
-    def __init__(self, input_len, vocab, gamma, lambda_g, hparams, device):
+    def __init__(self, input_len, vocab, hparams, device):
         super().__init__()
         self._hparams = tx.HParams(hparams, None)
         self.vocab = vocab
-        self.gamma = gamma
-        self.lambda_g = lambda_g
         self.embedder = WordEmbedder(
             vocab_size=vocab.size,
             hparams=self._hparams.embedder).to(device)
@@ -38,17 +36,10 @@ class CtrlGenModel(nn.Module):
         # Creates classifier
         self.clas_embedder = WordEmbedder(vocab_size=self.vocab.size,
                                           hparams=self._hparams.embedder).to(device)
-        # texar's tensorflow has different argument name for out_channels, change it
-        classifier_hp = self._hparams.classifier
-        if 'filters' in list(classifier_hp.keys()):
-            classifier_hp = self._hparams.todict()['classifier']
-            filters = classifier_hp.pop('filters')
-            classifier_hp['out_channels'] = filters
-            classifier_hp['data_format'] = 'channels_last'
 
         self.classifier = Conv1DClassifier(in_features=input_len,
                                            in_channels=self.embedder.dim,
-                                           hparams=classifier_hp).to(device)
+                                           hparams=self._hparams.classifier).to(device)
 
     def g_params(self):
         # do not include embedder since its parameters are present in the decoder
@@ -76,9 +67,9 @@ class CtrlGenModel(nn.Module):
         # loss_d_clas = tf.reduce_mean(loss_d_clas) FIXME
         accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
 
-        return loss_d_clas, None
+        return loss_d_clas
 
-    def forward_g(self, inputs):
+    def forward_g(self, inputs, gamma, lambda_g):
         # text_ids for encoder, with BOS token removed
         enc_text_ids = inputs['text_ids'][:, 1:]
         enc_outputs, final_state = self.encoder(self.embedder(enc_text_ids),
@@ -108,7 +99,7 @@ class CtrlGenModel(nn.Module):
         # Gumbel-softmax decoding, used in training
         start_tokens = torch.ones_like(inputs['labels']) * self.vocab.bos_token_id
         end_token = self.vocab.eos_token_id
-        gumbel_helper = GumbelSoftmaxEmbeddingHelper(start_tokens, end_token, tau=self.gamma)
+        gumbel_helper = GumbelSoftmaxEmbeddingHelper(start_tokens, end_token, tau=gamma)
         # gumbel_helper.initialize(self.embedder.embedding) FIXME
 
         soft_outputs_, _, soft_length_, = self.decoder(
@@ -133,19 +124,18 @@ class CtrlGenModel(nn.Module):
         # loss_g_clas = tf.reduce_mean(loss_g_clas) FIXME
 
         # Aggregates losses
-        loss_g = loss_g_ae + self.lambda_g * loss_g_clas
+        loss_g = loss_g_ae + lambda_g * loss_g_clas
 
-        return loss_g, (soft_preds, outputs_, length_)
+        return loss_g, soft_preds, outputs_, length_
 
-    def forward(self, inputs, mode):
-        loss, result = getattr(self, f'forward_{mode}')(inputs)
+    def forward(self, inputs, mode, gamma=None, lambda_g=None):
+        if mode == "g":
+            loss, soft_preds, outputs_, length_ = self.forward_g(inputs, gamma, lambda_g)
 
-        if result is not None:
-            soft_preds, outputs_, length_ = result
             with torch.no_grad():
                 # Accuracy on soft samples, for training progress monitoring
                 accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
-                                        preds=soft_preds)
+                                           preds=soft_preds)
 
                 # Accuracy on greedy-decoded samples, for training progress monitoring
                 _, gdy_preds = self.classifier(
@@ -153,6 +143,10 @@ class CtrlGenModel(nn.Module):
                     sequence_length=length_)
                 accu_g_gdy = tx.evals.accuracy(
                     labels=1 - inputs['labels'], preds=gdy_preds)
+        elif mode == "d":
+            loss = self.forward_d(inputs)
+        else:
+            ...
 
         return loss
 

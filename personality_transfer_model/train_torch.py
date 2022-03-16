@@ -103,9 +103,21 @@ def main():
     batch = iterator.get_iterator('train_d').__next__()
 
     # Model
-    gamma = config.gamma_decay
-    lambda_g = config.lambda_g
-    model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab, gamma, lambda_g,
+    gamma_decay = config.gamma_decay
+    model_config = config.model
+
+    # Convert config options from tf to torch syntax
+    if model_config['opt']['optimizer']['type'] == 'AdamOptimizer':
+        model_config['opt']['optimizer']['type'] = 'Adam'
+    if 'learning_rate' in model_config['opt']['optimizer']['kwargs']:
+        lr = model_config['opt']['optimizer']['kwargs'].pop('learning_rate')
+        model_config['opt']['optimizer']['kwargs']['lr'] = lr
+    if 'filters' in model_config['classifier']:
+        filters = model_config['classifier'].pop('filters')
+        model_config['classifier']['out_channels'] = filters
+        model_config['classifier']['data_format'] = 'channels_last'
+
+    model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab,
                          config.model, device).to(device)
 
     initial_epoch = 1
@@ -115,27 +127,22 @@ def main():
         model.load_state_dict(checkpoint['model_state_dict'])
         initial_epoch = checkpoint['epoch']
 
-    gamma_ = 1.
-    lambda_g_ = 0.
+    gamma = 1.
+    lambda_g = 0.
 
-    # Convert options from tf to torch syntax
-    opt_hp = model._hparams.opt.todict()
-    if opt_hp['optimizer']['type'] == 'AdamOptimizer':
-        opt_hp['optimizer']['type'] = 'Adam'
-        if 'learning_rate' in opt_hp['optimizer']['kwargs']:
-            lr = opt_hp['optimizer']['kwargs'].pop('learning_rate')
-            opt_hp['optimizer']['kwargs']['lr'] = lr
-    train_g = tx.core.get_train_op(model.g_params(), hparams=opt_hp)
-    train_g_ae = tx.core.get_train_op(model.g_params(), hparams=opt_hp)
-    train_d = tx.core.get_train_op(model.d_params(), hparams=opt_hp)
+    train_g = tx.core.get_train_op(model.g_params(),
+                                   hparams=model._hparams.opt)
+    train_d = tx.core.get_train_op(model.d_params(),
+                                   hparams=model._hparams.opt)
 
     print(f'Starting training from epoch {initial_epoch}')
     for epoch in range(initial_epoch, config.max_nepochs + 1):
+        if epoch == config.pretrain_nepochs+1:
+            lambda_g = config.lambda_g
         if epoch > config.pretrain_nepochs:
             # Anneals the gumbel-softmax temperature
-            gamma_ = max(0.001, gamma_ * gamma)
-            lambda_g_ = lambda_g
-        print('gamma: {}, lambda_g: {}'.format(gamma_, lambda_g_))
+            gamma = max(0.001, gamma * gamma_decay)
+        print('gamma: {}, lambda_g: {}'.format(gamma, lambda_g))
 
         # Train
         avg_meters_d = tx.utils.AverageRecorder(size=10)
@@ -148,7 +155,7 @@ def main():
             loss_d.backward()
             train_d()
 
-            loss_g = model.forward(batch_g, mode='g')
+            loss_g = model.forward(batch_g, mode='g', gamma=gamma, lambda_g=lambda_g)
             loss_g.backward()
             train_g()
 
