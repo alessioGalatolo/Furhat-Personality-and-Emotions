@@ -26,7 +26,7 @@ from tqdm import tqdm
 from ctrl_gen_model_torch import CtrlGenModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print(f"Running pytorch using {device}")
 
 # def eval_epoch(sess, gamma_, lambda_g_, epoch, val_or_test='val'):
 #     avg_meters = tx.utils.AverageRecorder()
@@ -82,7 +82,8 @@ def main():
     config = importlib.import_module(args.config)
 
     # Data
-    train_data = tx.data.MultiAlignedData(config.train_data(args.dataset))
+    train_data = tx.data.MultiAlignedData(config.train_data(args.dataset),
+                                          device=device)
     # val_data = tx.data.MultiAlignedData(config.val_data)
     # test_data = tx.data.MultiAlignedData(config.test_data)
     vocab = train_data.vocab(0)
@@ -97,7 +98,8 @@ def main():
     # Model
     gamma = config.gamma_decay
     lambda_g = config.lambda_g
-    model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab, gamma, lambda_g, config.model).to(device)
+    model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab, gamma, lambda_g,
+                         config.model, device).to(device)
 
     os.makedirs(config.sample_path, exist_ok=True)
     os.makedirs(config.checkpoint_path, exist_ok=True)
@@ -117,9 +119,9 @@ def main():
         if 'learning_rate' in opt_hp['optimizer']['kwargs']:
             lr = opt_hp['optimizer']['kwargs'].pop('learning_rate')
             opt_hp['optimizer']['kwargs']['lr'] = lr
-    train_g = tx.core.get_optimizer(model.g_params(), hparams=opt_hp)
-    train_g_ae = tx.core.get_optimizer(model.g_params(), hparams=opt_hp)
-    train_d = tx.core.get_optimizer(model.d_params(), hparams=opt_hp)
+    train_g = tx.core.get_train_op(model.g_params(), hparams=opt_hp)
+    train_g_ae = tx.core.get_train_op(model.g_params(), hparams=opt_hp)
+    train_d = tx.core.get_train_op(model.d_params(), hparams=opt_hp)
     for epoch in range(1, config.max_nepochs + 1):
         if epoch > config.pretrain_nepochs:
             # Anneals the gumbel-softmax temperature
@@ -134,19 +136,15 @@ def main():
                                          iterator.get_iterator('train_g')),
                                      total=int(len(train_data)/train_data.batch_size)):
 
-            loss_g, loss_g_ae, loss_d = model(batch_d)
+            loss_d = model.forward(batch_d, mode='d')
             loss_d.backward()
             train_d()
-            batch_d.to('cpu')
 
-            loss_g, loss_g_ae, loss_d = model(batch_g)
+            loss_g = model.forward(batch_g, mode='g')
             loss_g.backward()
             train_g()
-            batch_g.to('cpu')
 
-        torch.save({'model_state_dict': model.state_dict(),
-                    'optimizer_d_state_dict': optim_d.state_dict(),
-                    'optimizer_g_state_dict': optim_g.state_dict()},
+        torch.save({'model_state_dict': model.state_dict()},
                    os.path.join(config.checkpoint_path, 'ckpt.pth'))
         # Val
         # iterator.restart_dataset(sess, 'val')
