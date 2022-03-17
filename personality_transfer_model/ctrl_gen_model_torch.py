@@ -67,7 +67,7 @@ class CtrlGenModel(nn.Module):
             input=clas_logits, target=inputs['labels'].to(torch.float32))
         accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
 
-        return loss_d_clas
+        return loss_d_clas, accu_d
 
     def forward_g(self, inputs, gamma, lambda_g):
         # text_ids for encoder, with BOS token removed
@@ -125,29 +125,31 @@ class CtrlGenModel(nn.Module):
         # Aggregates losses
         loss_g = loss_g_ae + lambda_g * loss_g_clas
 
-        return loss_g, soft_preds, outputs_, length_
+        with torch.no_grad():
+            # Accuracy on soft samples, for training progress monitoring
+            accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
+                                        preds=soft_preds)
+
+            # Accuracy on greedy-decoded samples, for training progress monitoring
+            _, gdy_preds = self.classifier(
+                input=self.clas_embedder(ids=outputs_.sample_id),
+                sequence_length=length_)
+            accu_g_gdy = tx.evals.accuracy(
+                labels=1 - inputs['labels'], preds=gdy_preds)
+
+        return loss_g, accu_g, accu_g_gdy
 
     def forward(self, inputs, mode, gamma=None, lambda_g=None):
         if mode == "g":
-            loss, soft_preds, outputs_, length_ = self.forward_g(inputs, gamma, lambda_g)
-
-            with torch.no_grad():
-                # Accuracy on soft samples, for training progress monitoring
-                accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
-                                           preds=soft_preds)
-
-                # Accuracy on greedy-decoded samples, for training progress monitoring
-                _, gdy_preds = self.classifier(
-                    input=self.clas_embedder(ids=outputs_.sample_id),
-                    sequence_length=length_)
-                accu_g_gdy = tx.evals.accuracy(
-                    labels=1 - inputs['labels'], preds=gdy_preds)
+            loss, accu_g, accu_g_gdy = self.forward_g(inputs, gamma, lambda_g)
+            accu = (accu_g.detach().cpu(), accu_g_gdy.detach().cpu())
         elif mode == "d":
-            loss = self.forward_d(inputs)
+            loss, accu_d = self.forward_d(inputs)
+            accu = accu_d.detach().cpu()
         else:
             ...
 
-        return loss
+        return loss, accu
 
     @torch.no_grad()
     def infer(self, inputs):

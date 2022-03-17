@@ -26,7 +26,7 @@ from tqdm import tqdm
 from ctrl_gen_model_torch import CtrlGenModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Running pytorch using {device}")
+print(f"Running PyTorch using {device}")
 
 # def eval_epoch(sess, gamma_, lambda_g_, epoch, val_or_test='val'):
 #     avg_meters = tx.utils.AverageRecorder()
@@ -158,17 +158,22 @@ def main():
         model.train()
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
-        for batch_d, batch_g in tqdm(zip(iterator.get_iterator('train_d'),
-                                         iterator.get_iterator('train_g')),
-                                     total=int(len(train_data)/train_data.batch_size)):
+        data_iterator = tqdm(zip(iterator.get_iterator('train_d'),
+                                 iterator.get_iterator('train_g')),
+                             total=int(len(train_data)/train_data.batch_size))
 
-            loss_d = model.forward(batch_d, mode='d')
+        for batch_d, batch_g in data_iterator:
+            loss_d, accu_d = model.forward(batch_d, mode='d')
             loss_d.backward()
             train_d()
+            avg_meters_d.add(accu_d)
 
-            loss_g = model.forward(batch_g, mode='g', gamma=gamma, lambda_g=lambda_g)
+            loss_g, (accu_g, accu_g_gdy) = model.forward(batch_g, mode='g', gamma=gamma, lambda_g=lambda_g)
             loss_g.backward()
             train_g()
+            avg_meters_g.add([accu_g, accu_g_gdy])
+            data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
+                                          + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
 
         torch.save({'model_state_dict': model.state_dict(),
                     'optim_d': optim_d.state_dict(),
