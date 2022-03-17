@@ -71,7 +71,7 @@ print(f"Running pytorch using {device}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='')  # TODO
+    parser = argparse.ArgumentParser(description='Model for text style transfer')
     parser.add_argument('--config',
                         default='config',
                         help='The config to use.')
@@ -124,8 +124,6 @@ def main():
                                     hparams=model._hparams.opt)
     optim_d = tx.core.get_optimizer(model.d_params(),
                                     hparams=model._hparams.opt)
-    train_g = tx.core.get_train_op(optim_g)
-    train_d = tx.core.get_train_op(optim_d)
 
     initial_epoch = 1
     if args.load_checkpoint:
@@ -136,18 +134,28 @@ def main():
         optim_d.load_state_dict(checkpoint['optim_d'])
         initial_epoch = checkpoint['epoch']
 
+    train_g = tx.core.get_train_op(optimizer=optim_g)
+    train_d = tx.core.get_train_op(optimizer=optim_d)
+
     gamma_0 = 1.
+    gamma = gamma_0
     lambda_g = 0.
 
     print(f'Starting training from epoch {initial_epoch}')
     for epoch in range(initial_epoch, config.max_nepochs + 1):
+        if epoch == config.pretrain_nepochs+1:
+            lambda_g = config.lambda_g
+            optim_g = tx.core.get_optimizer(model.g_params(),
+                                            hparams=model._hparams.opt)
+            train_g = tx.core.get_train_op(optimizer=optim_g)
+
         if epoch > config.pretrain_nepochs:
             # Anneals the gumbel-softmax temperature
             gamma = max(0.001, gamma_0 * (gamma_decay ** (epoch-config.pretrain_nepochs)))
-            lambda_g = config.lambda_g
-        print('gamma: {}, lambda_g: {}'.format(gamma, lambda_g))
+        print(f'gamma: {gamma}, lambda_g: {lambda_g}')
 
         # Train
+        model.train()
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
         for batch_d, batch_g in tqdm(zip(iterator.get_iterator('train_d'),

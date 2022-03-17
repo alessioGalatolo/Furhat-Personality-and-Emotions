@@ -31,8 +31,9 @@ class CtrlGenModel(nn.Module):
             vocab_size=self.vocab.size,
             hparams=self._hparams.decoder).to(device)
 
+        connector_lldim = self._hparams.dim_c + self._hparams.dim_z
         self.connector = MLPTransformConnector(output_size=self.decoder.output_size,
-                                               linear_layer_dim=(self._hparams.dim_c + self._hparams.dim_z)).to(device)
+                                               linear_layer_dim=connector_lldim).to(device)
         # Creates classifier
         self.clas_embedder = WordEmbedder(vocab_size=self.vocab.size,
                                           hparams=self._hparams.embedder).to(device)
@@ -64,7 +65,6 @@ class CtrlGenModel(nn.Module):
             sequence_length=inputs['length'] - 1)
         loss_d_clas = nn.functional.binary_cross_entropy_with_logits(
             input=clas_logits, target=inputs['labels'].to(torch.float32))
-        # loss_d_clas = tf.reduce_mean(loss_d_clas) FIXME
         accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
 
         return loss_d_clas
@@ -121,7 +121,6 @@ class CtrlGenModel(nn.Module):
         loss_g_clas = nn.functional.binary_cross_entropy_with_logits(
             input=soft_logits,
             target=(1 - inputs['labels']).to(torch.float32))
-        # loss_g_clas = tf.reduce_mean(loss_g_clas) FIXME
 
         # Aggregates losses
         loss_g = loss_g_ae + lambda_g * loss_g_clas
@@ -150,5 +149,6 @@ class CtrlGenModel(nn.Module):
 
         return loss
 
+    @torch.no_grad()
     def infer(self, inputs):
         ...
