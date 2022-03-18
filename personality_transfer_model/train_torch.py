@@ -28,47 +28,6 @@ from ctrl_gen_model_torch import CtrlGenModel
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Running PyTorch using {device}")
 
-# def eval_epoch(sess, gamma_, lambda_g_, epoch, val_or_test='val'):
-#     avg_meters = tx.utils.AverageRecorder()
-
-#     while True:
-#         try:
-#             feed_dict = {
-#                 iterator.handle: iterator.get_handle(sess, val_or_test),
-#                 gamma: gamma_,
-#                 lambda_g: lambda_g_,
-#                 tx.context.global_mode(): tf.estimator.ModeKeys.EVAL
-#             }
-
-#             vals = sess.run(model.fetches_eval, feed_dict=feed_dict)
-
-#             batch_size = vals.pop('batch_size')
-
-#             # Computes BLEU
-#             samples = tx.utils.dict_pop(vals, list(model.samples.keys()))
-#             hyps = tx.utils.map_ids_to_strs(samples['transferred'], vocab)
-
-#             refs = tx.utils.map_ids_to_strs(samples['original'], vocab)
-#             refs = np.expand_dims(refs, axis=1)
-
-#             bleu = tx.evals.corpus_bleu_moses(refs, hyps)
-#             vals['bleu'] = bleu
-
-#             avg_meters.add(vals, weight=batch_size)
-
-#             # Writes samples
-#             tx.utils.write_paired_text(
-#                 refs.squeeze(), hyps,
-#                 os.path.join(config.sample_path, 'val.%d' % epoch),
-#                 append=True, mode='v')
-
-#         except tf.errors.OutOfRangeError:
-#             print('{}: {}'.format(
-#                 val_or_test, avg_meters.to_str(precision=4)))
-#             break
-
-#     return avg_meters.avg()
-
 
 def main():
     parser = argparse.ArgumentParser(description='Model for text style transfer')
@@ -91,8 +50,6 @@ def main():
     # Data
     train_data = tx.data.MultiAlignedData(config.train_data(args.dataset),
                                           device=device)
-    # val_data = tx.data.MultiAlignedData(config.val_data)
-    # test_data = tx.data.MultiAlignedData(config.test_data)
     vocab = train_data.vocab(0)
 
     # Each training batch is used twice: once for updating the generator and
@@ -100,24 +57,12 @@ def main():
     # such case.
     iterator = tx.data.DataIterator(
         {'train_g': train_data, 'train_d': train_data})
-    batch = iterator.get_iterator('train_d').__next__()
+    input_len = iterator.get_iterator('train_d').__next__()['text_ids'].size(1)-1
 
     # Model
     gamma_decay = config.gamma_decay
-    model_config = config.model
 
-    # Convert config options from tf to torch syntax
-    if model_config['opt']['optimizer']['type'] == 'AdamOptimizer':
-        model_config['opt']['optimizer']['type'] = 'Adam'
-    if 'learning_rate' in model_config['opt']['optimizer']['kwargs']:
-        lr = model_config['opt']['optimizer']['kwargs'].pop('learning_rate')
-        model_config['opt']['optimizer']['kwargs']['lr'] = lr
-    if 'filters' in model_config['classifier']:
-        filters = model_config['classifier'].pop('filters')
-        model_config['classifier']['out_channels'] = filters
-        model_config['classifier']['data_format'] = 'channels_last'
-
-    model = CtrlGenModel(batch['text_ids'].size(1)-1, vocab,
+    model = CtrlGenModel(input_len, vocab,
                          config.model, device).to(device)
 
     optim_g = tx.core.get_optimizer(model.g_params(),
@@ -142,6 +87,8 @@ def main():
     lambda_g = 0.
 
     print(f'Starting training from epoch {initial_epoch}')
+
+    # Train
     for epoch in range(initial_epoch, config.max_nepochs + 1):
         if epoch == config.pretrain_nepochs+1:
             lambda_g = config.lambda_g
@@ -154,8 +101,6 @@ def main():
             gamma = max(0.001, gamma_0 * (gamma_decay ** (epoch-config.pretrain_nepochs)))
         print(f'gamma: {gamma}, lambda_g: {lambda_g}')
 
-        # Train
-        model.train()
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
         data_iterator = tqdm(zip(iterator.get_iterator('train_d'),
@@ -168,28 +113,23 @@ def main():
             train_d()
             avg_meters_d.add(accu_d)
 
-            loss_g, (accu_g, accu_g_gdy) = model.forward(batch_g, mode='g', gamma=gamma, lambda_g=lambda_g)
+            loss_g, accu_g = model.forward(batch_g, mode='g', gamma=gamma, lambda_g=lambda_g)
             loss_g.backward()
             train_g()
-            avg_meters_g.add([accu_g, accu_g_gdy])
+            avg_meters_g.add(accu_g)
             data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
                                           + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
+            break
 
         torch.save({'model_state_dict': model.state_dict(),
                     'optim_d': optim_d.state_dict(),
                     'optim_g': optim_g.state_dict(),
                     'epoch': epoch},
                    checkpoint_path)
-        # Val
-        # iterator.restart_dataset(sess, 'val')
-        # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'val')
-
-        # saver.save(
-        #     sess, os.path.join(config.checkpoint_path, 'ckpt'), epoch)
-
-        # # Test
-        # iterator.restart_dataset(sess, 'test')
-        # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'test')
+    torch.save({'model_state_dict': model.state_dict(),
+                'input_len': input_len,
+                'vocab_file': config.train_data(args.dataset)['datasets'][0]['vocab_file']},
+               os.path.join(config.checkpoint_path, 'final_model.pth'))
 
 
 if __name__ == '__main__':
