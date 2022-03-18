@@ -7,19 +7,16 @@ Zhiting Hu, Zichao Yang, Xiaodan Liang, Ruslan Salakhutdinov, Eric Xing
 
 Download the data with the cmd:
 
-$ python prepare_data.py
+$ python prepare_data.py --dataset <dataset>
 
 Train the model with the cmd:
 
 $ python train_torch.py --config config --dataset <dataset>
 """
 
-# pylint: disable=invalid-name, too-many-locals, too-many-arguments, no-member
-
 import os
 import argparse
 import importlib
-import numpy as np
 import torch
 import texar.torch as tx
 from tqdm import tqdm
@@ -108,18 +105,17 @@ def main():
                              total=int(len(train_data)/train_data.batch_size))
 
         for batch_d, batch_g in data_iterator:
-            loss_d, accu_d = model.forward(batch_d, mode='d')
+            loss_d, accu_d = model.forward(batch_d, step='d')
             loss_d.backward()
             train_d()
             avg_meters_d.add(accu_d)
 
-            loss_g, accu_g = model.forward(batch_g, mode='g', gamma=gamma, lambda_g=lambda_g)
+            loss_g, accu_g = model.forward(batch_g, step='g', gamma=gamma, lambda_g=lambda_g)
             loss_g.backward()
             train_g()
             avg_meters_g.add(accu_g)
             data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
                                           + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
-            break
 
         torch.save({'model_state_dict': model.state_dict(),
                     'optim_d': optim_d.state_dict(),

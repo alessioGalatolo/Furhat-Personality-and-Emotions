@@ -60,19 +60,18 @@ class CtrlGenModel(nn.Module):
             params += list(model.parameters())
         return params
 
-    def forward_d(self, inputs):
+    def forward_d(self, inputs, mode):
         # Classification loss for the classifier
         clas_logits, clas_preds = self.classifier(
             input=self.clas_embedder(ids=inputs['text_ids'][:, 1:]),
             sequence_length=inputs['length'] - 1)
-        if 'labels' in inputs:  # check for eval vs train # FIXME
+        if mode == 'train':  # check for eval vs train
             loss_d_clas = nn.functional.binary_cross_entropy_with_logits(
                 input=clas_logits, target=inputs['labels'].to(torch.float32))
-        else:
-            loss_d_clas = None
-        return loss_d_clas, clas_preds
+            return loss_d_clas, clas_preds
+        return clas_preds
 
-    def forward_g(self, inputs, gamma, lambda_g):
+    def forward_g(self, inputs, mode, gamma=None, lambda_g=None):
         # text_ids for encoder, with BOS token removed
         enc_text_ids = inputs['text_ids'][:, 1:]
         enc_outputs, final_state = self.encoder(self.embedder(enc_text_ids),
@@ -116,6 +115,9 @@ class CtrlGenModel(nn.Module):
             memory_sequence_length=inputs['length'] - 1,
             decoding_strategy='infer_greedy', initial_state=self.connector(h_),
             start_tokens=start_tokens, end_token=end_token)
+        if mode == 'eval':
+            # Done here
+            return outputs_
 
         # Classification loss for the generator, based on soft samples
         soft_logits, soft_preds = self.classifier(
@@ -130,10 +132,10 @@ class CtrlGenModel(nn.Module):
 
         return loss_g, (outputs_, length_, soft_preds)
 
-    def forward(self, inputs, mode, gamma=None, lambda_g=None):
+    def forward(self, inputs, step, mode='train', gamma=None, lambda_g=None):
         self.train()
-        if mode == "g":
-            loss, (outputs_, length_, soft_preds) = self.forward_g(inputs, gamma, lambda_g)
+        if step == "g":
+            loss, (outputs_, length_, soft_preds) = self.forward_g(inputs, mode, gamma, lambda_g)
             with torch.no_grad():
                 # Accuracy on soft samples, for training progress monitoring
                 accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
@@ -146,8 +148,8 @@ class CtrlGenModel(nn.Module):
                 accu_g_gdy = tx.evals.accuracy(
                     labels=1 - inputs['labels'], preds=gdy_preds)
             accu = [accu_g.detach().cpu(), accu_g_gdy.detach().cpu()]
-        elif mode == "d":
-            loss, clas_preds = self.forward_d(inputs)
+        elif step == "d":
+            loss, clas_preds = self.forward_d(inputs, mode)
             accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
             accu = accu_d.detach().cpu()
         else:
@@ -158,19 +160,19 @@ class CtrlGenModel(nn.Module):
     @torch.no_grad()
     def infer(self, text, transfer_clas):
         self.eval()
-        text_tokens = text.split()  # FIXME: check length and eventually pad sequence
+        text_tokens = text.split()
         text_tokens.insert(0, self.vocab.bos_token)
         text_tokens.append(self.vocab.eos_token)
-        if len(text_tokens) < self.input_len:
+        if len(text_tokens) < self.input_len:  # FIXME: check length and eventually pad sequence
             for _ in range(self.classifier.output_size-len(text_tokens)):
                 text_tokens.append('')
         text_ids = self.vocab.map_tokens_to_ids_py(text_tokens)
         inputs = {'text_ids': torch.Tensor(np.array([text_ids])).long(),
                   'length': torch.Tensor([len(text_ids)]).long()}
-        _, clas_preds = self.forward_d(inputs)
+        clas_preds = self.forward_d(inputs, mode='eval')
         inputs['labels'] = clas_preds
         if clas_preds.item() != transfer_clas:
-            _, (output_ids, length, _) = self.forward_g(inputs, gamma=1, lambda_g=0)  # FIXME
+            output_ids = self.forward_g(inputs, mode='eval')
         else:
             output_ids = text_ids
 
