@@ -15,17 +15,11 @@
 """
 import argparse
 from collections import defaultdict
-from os import makedirs, mkdir, path, rename, listdir
+from os import makedirs, mkdir, path, listdir
 from re import findall
 import pandas as pd
 from tqdm import tqdm
 import texar.torch as tx
-
-
-def prepare_yelp(**kwargs):
-    """Downloads data.
-    """
-    rename(r"./yelp/sentiment.*", r"./yelp/*")
 
 
 def prepare_ear():
@@ -39,13 +33,18 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
     if expand_essays:
         print('Expanding the essays into single sentences, this will probably take a long time...')
         unexpanded_data = data
+        unexpanded_data[traits_labels] = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
         data = pd.DataFrame()
         with open(text_file, "w+") as text:
             data_iterator = unexpanded_data.iterrows()
             if interactive:
                 data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
             for row in data_iterator:
+                personality_score = 0
+                for i, trait in enumerate(traits_labels):
+                    personality_score += row[1][trait] * (2 ** i)  # get a value expressing the whole personality
                 row_data = {trait: row[1][trait] for trait in traits_labels}
+                row_data['personality'] = personality_score
                 for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
                     for match in sentence:
                         if match and len(match.split()) < max_length:
@@ -53,10 +52,11 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
                     data = data.append(row_data, ignore_index=True)
     else:
         data['text'].to_csv(text_file, index=False, header=False)
-    numerical_traits = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
     for trait in traits_labels:
-        numerical_traits[trait].to_csv(f'{label_file}_{trait[1:4]}',
+        data[trait].astype(int).to_csv(f'{label_file}_{trait[1:4]}',
                                        index=False, header=False)
+    data['personality'].astype(int).to_csv(f'{label_file}_FULL',
+                               index=False, header=False)
     with open(vocab_file, "w+") as vocab:
         vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
@@ -80,16 +80,14 @@ def main():
                    'essays': prepare_essays,
                    'mbti': prepare_mbti,
                    'personage-data': prepare_personage_data,
-                   'personality-detection': prepare_personality_detection,
-                   'yelp': prepare_yelp}  # FIXME: remove yelp, only used for debugging
+                   'personality-detection': prepare_personality_detection}
     DATASET2LINK = {'ear': ...,  # TODO
                     'essays': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/essays/essays.csv?raw=true",
                     'mbti': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/kaggle/kaggle.csv?raw=true",
                     'personage-data': "http://farm2.user.srcf.net/research/personage/personage-data.tar.gz",
-                    'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv",
-                    'yelp': "https://drive.google.com/file/d/'1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing"}
+                    'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv"}
     DOWNLOAD_IS_COMPRESSED = defaultdict(lambda: False,
-                                         [('yelp', True), ('personage-data', True)])
+                                         [('personage-data', True)])
 
     parser = argparse.ArgumentParser(description='Dataset downloader and preprocessor')
     parser.add_argument('--dataset',

@@ -45,7 +45,7 @@ def main():
                         default='./personality_transfer_model/data')
     parser.add_argument('--trait',
                         help='The traits to use as classification',
-                        choices=['OPN', 'CON', 'EXT', 'AGR', 'NEU'],
+                        choices=['OPN', 'CON', 'EXT', 'AGR', 'NEU', 'FULL'],
                         required=True)
     parser.add_argument('--offline',
                         help='If true will run wandb offline',
@@ -55,6 +55,8 @@ def main():
                         action='store_true')
     args = parser.parse_args()
     config = importlib.import_module(args.config)
+    if args.trait == 'FULL':
+        config.model['classifier']['num_classes'] = 32
 
     if wandb is not None:
         mode = 'offline' if args.offline else 'online'
