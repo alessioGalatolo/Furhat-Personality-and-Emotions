@@ -32,7 +32,7 @@ def prepare_ear():
     ...
 
 
-def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, expand_essays=True):
+def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, interactive, expand_essays=True):
     traits_labels = ['cOPN', 'cCON', 'cEXT', 'cAGR', 'cNEU']
     with open(f"{base_path}/essays", "r") as essays:
         data = pd.read_csv(essays)
@@ -41,7 +41,10 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, exp
         unexpanded_data = data
         data = pd.DataFrame()
         with open(text_file, "w+") as text:
-            for row in tqdm(unexpanded_data.iterrows(), total=unexpanded_data.shape[0]):
+            data_iterator = unexpanded_data.iterrows()
+            if interactive:
+                data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
+            for row in data_iterator:
                 row_data = {trait: row[1][trait] for trait in traits_labels}
                 for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
                     for match in sentence:
@@ -99,6 +102,9 @@ def main():
     parser.add_argument('--max-length',
                         help='Max length (number of words) for a row in the dataset',
                         default=20)
+    parser.add_argument('--interactive',
+                        help='If true will use tqdm to show progress',
+                        action='store_true')
     args = parser.parse_args()
 
     store_path = path.join(args.base_path, "original_datasets", args.dataset)
@@ -125,7 +131,8 @@ def main():
                               args.max_length,
                               f"{store_processed_path}/text",
                               f"{store_processed_path}/labels",
-                              f"{store_processed_path}/vocab")
+                              f"{store_processed_path}/vocab",
+                              args.interactive)
     print("Dataset preprocessed correctly")
 
 

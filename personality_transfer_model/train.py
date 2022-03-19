@@ -142,9 +142,11 @@ def main():
 
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
-        data_iterator = tqdm(zip(iterator.get_iterator('train_d'),
-                                 iterator.get_iterator('train_g')),
-                             total=int(len(train_data)/train_data.batch_size))
+        data_iterator = zip(iterator.get_iterator('train_d'),
+                            iterator.get_iterator('train_g'))
+        if wandb is None or args.offline:
+            data_iterator = tqdm(data_iterator,
+                                 total=int(len(train_data)/train_data.batch_size))
 
         for batch_d, batch_g in data_iterator:
             loss_d, accu_d = model.forward(batch_d, step='d')
