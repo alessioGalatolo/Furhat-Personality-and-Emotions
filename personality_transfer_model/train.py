@@ -61,7 +61,8 @@ def main():
         wandb.init(project="personality-transfer",
                    entity="galatoloa",
                    mode=mode,
-                   config=config.model)
+                   config=config.model,
+                   settings=wandb.Settings(start_method='fork'))
         config = wandb.config
     else:
         config = tx.HParams(config.model, None)
