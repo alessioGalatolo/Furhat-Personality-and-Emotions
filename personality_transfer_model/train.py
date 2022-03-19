@@ -47,6 +47,9 @@ def main():
                         help='The traits to use as classification',
                         choices=['OPN', 'CON', 'EXT', 'AGR', 'NEU'],
                         required=True)
+    parser.add_argument('--offline',
+                        help='If true will run wandb offline',
+                        action='store_true')
     parser.add_argument('--load-checkpoint',
                         help='Whether to start again from the last checkpoint',
                         action='store_true')
@@ -54,8 +57,10 @@ def main():
     config = importlib.import_module(args.config)
 
     if wandb is not None:
+        mode = 'offline' if args.offline else 'online'
         wandb.init(project="personality-transfer",
                    entity="galatoloa",
+                   mode=mode,
                    config=config.model)
         config = wandb.config
     else:
@@ -70,12 +75,12 @@ def main():
         'seed': config.seed,
         'datasets': [
             {
-                'files': f'./personality_transfer_model/data/{args.dataset}/text',
-                'vocab_file': f'./personality_transfer_model/data/{args.dataset}/vocab',
+                'files': f'{args.base_path}/{args.dataset}/text',
+                'vocab_file': f'{args.base_path}/{args.dataset}/vocab',
                 'data_name': ''
             },
             {
-                'files': f'./personality_transfer_model/data/{args.dataset}/labels_{args.trait}',
+                'files': f'{args.base_path}/{args.dataset}/labels_{args.trait}',
                 'data_name': 'labels',
                 'data_type': 'int'
             }
