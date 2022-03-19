@@ -158,8 +158,9 @@ def main():
             loss_g.backward()
             train_g()
             avg_meters_g.add(accu_g)
-            data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
-                                          + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
+            if wandb is None or args.offline:
+                data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
+                                              + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
             if wandb is not None:
                 wandb.log({'Accuracy D': avg_meters_d.to_str(precision=4),
                            'Accuracy G': avg_meters_g.to_str(precision=4)})
