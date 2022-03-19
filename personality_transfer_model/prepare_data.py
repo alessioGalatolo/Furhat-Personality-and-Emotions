@@ -36,7 +36,7 @@ def prepare_ear():
     ...
 
 
-def prepare_essays(base_path, text_file, label_file, vocab_file, expand_essays=True):
+def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, expand_essays=True):
     traits_labels = ['cOPN', 'cCON', 'cEXT', 'cAGR', 'cNEU']
     with open(f"{base_path}/essays", "r") as essays:
         data = pd.read_csv(essays)
@@ -49,7 +49,7 @@ def prepare_essays(base_path, text_file, label_file, vocab_file, expand_essays=T
                 row_data = {trait: row[1][trait] for trait in traits_labels}
                 for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
                     for match in sentence:
-                        if match:
+                        if match and len(match.split()) < max_length:
                             text.write(match.replace(".", " .").replace("!", " !").replace("?", " ?").strip() + "\n")
                     data = data.append(row_data, ignore_index=True)
     else:
@@ -100,6 +100,9 @@ def main():
     parser.add_argument('--base-path',
                         help='base path for the dataset dir',
                         default='./personality_transfer_model/data')
+    parser.add_argument('--max-length',
+                        help='Max length (number of words) for a row in the dataset',
+                        default=20)
     args = parser.parse_args()
 
     store_path = path.join(args.base_path, "original_datasets", args.dataset)
@@ -123,6 +126,7 @@ def main():
     else:
         mkdir(store_processed_path)
     DATASET2FUN[args.dataset](store_path,
+                              args.max_length,
                               f"{store_processed_path}/text",
                               f"{store_processed_path}/labels",
                               f"{store_processed_path}/vocab")
