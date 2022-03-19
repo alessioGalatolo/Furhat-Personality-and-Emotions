@@ -162,8 +162,11 @@ def main():
                 data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
                                               + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
             if wandb is not None:
+                accu_g = avg_meters_g.avg()
+                accu_g, accu_g_gdy = accu_g[0].item(), accu_g[1].item()
                 wandb.log({'Accuracy D': avg_meters_d.avg().item(),
-                           'Accuracy G': avg_meters_g.avg().item()})
+                           'Accuracy G': accu_g,
+                           'Accuracy G GDY': accu_g_gdy})
 
         torch.save({'model_state_dict': model.state_dict(),
                     'optim_d': optim_d.state_dict(),
