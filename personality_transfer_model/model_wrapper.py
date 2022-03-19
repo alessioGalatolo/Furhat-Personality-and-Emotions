@@ -8,18 +8,19 @@ from ctrl_gen_model_torch import CtrlGenModel
 class PersonalityTransfer:
     def __init__(self, config_module, device='cpu'):
         config = import_module(config_module)
+        config = tx.HParams(config.tf_config2torch(config.model), None)
         checkpoint_path = path.join(config.checkpoint_path, 'final_model.pth')
         assert path.exists(checkpoint_path)
 
         checkpoint = torch.load(checkpoint_path)
         self.input_len = checkpoint['input_len']
 
-        # FIXME
+        # FIXME: should not access that default hparams
         vocab_hp = tx.HParams({'vocab_file': checkpoint['vocab_file']},
                               tx.data.data.multi_aligned_data._default_dataset_hparams())
         self.vocab = tx.data.MultiAlignedData.make_vocab([vocab_hp])[0]
         self.model = CtrlGenModel(self.input_len,
-                                  self.vocab, config.model, device)
+                                  self.vocab, config, device)
         self.model.load_state_dict(checkpoint['model_state_dict'], strict=True)
 
     def transfer(self, text, transfer_clas):
@@ -42,4 +43,4 @@ class PersonalityTransfer:
 # Testing
 if __name__ == "__main__":
     personality_transfer = PersonalityTransfer('config')
-    print(personality_transfer.transfer("this a not so long text", 1))
+    print(personality_transfer.transfer("this a not so long text", 0))

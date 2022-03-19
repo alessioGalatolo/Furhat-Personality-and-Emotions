@@ -1,30 +1,23 @@
 """Config
 """
 
-# pylint: disable=invalid-name
 
-import copy
-
-# Total number of training epochs (including pre-train and full-train)
-max_nepochs = 12
-pretrain_nepochs = 10  # Number of pre-train epochs (training as autoencoder)
-display = 500  # Display the training results every N training steps.
-# Display the dev results every N training steps (set to a
-# very large value to disable it).
-display_eval = 1e10
-
-sample_path = './samples'
-checkpoint_path = './checkpoints'
-restore = ''   # Model snapshot to restore from
-
-lambda_g = 0.1  # Weight of the classification loss
-gamma_decay = 0.5  # Gumbel-softmax temperature anneal rate
+def tf_config2torch(model_config):
+    # Convert config options from tf to torch syntax
+    if model_config['opt']['optimizer']['type'] == 'AdamOptimizer':
+        model_config['opt']['optimizer']['type'] = 'Adam'
+    if 'learning_rate' in model_config['opt']['optimizer']['kwargs']:
+        lr = model_config['opt']['optimizer']['kwargs'].pop('learning_rate')
+        model_config['opt']['optimizer']['kwargs']['lr'] = lr
+    if 'filters' in model_config['classifier']:
+        filters = model_config['classifier'].pop('filters')
+        model_config['classifier']['out_channels'] = filters
+        model_config['classifier']['data_format'] = 'channels_last'
+    return model_config
 
 
 def train_data(dataset):
     return {
-        'batch_size': 64,
-        'seed': 123,
         'datasets': [
             {
                 'files': f'./personality_transfer_model/data/{dataset}/text',
@@ -40,16 +33,19 @@ def train_data(dataset):
         'name': 'train'
     }
 
-# val_data = copy.deepcopy(train_data)
-# val_data['datasets'][0]['files'] = './data/yelp/sentiment.dev.text'
-# val_data['datasets'][1]['files'] = './data/yelp/sentiment.dev.labels'
-
-# test_data = copy.deepcopy(train_data)
-# test_data['datasets'][0]['files'] = './data/yelp/sentiment.test.text'
-# test_data['datasets'][1]['files'] = './data/yelp/sentiment.test.labels'
-
 
 model = {
+    'batch_size': 32,
+    'seed': 123,
+    # Total number of training epochs (including pre-train and full-train)
+    'max_nepochs': 12,
+    'pretrain_nepochs': 10,  # Number of pre-train epochs (training as autoencoder)
+    'checkpoint_path': './checkpoints',
+    'lambda_g': 0.1,  # Weight of the classification loss
+    'gamma': 1,
+    'gamma_decay': 0.5,  # Gumbel-softmax temperature anneal rate
+
+    # models parameters
     'dim_c': 200,
     'dim_z': 500,
     'embedder': {

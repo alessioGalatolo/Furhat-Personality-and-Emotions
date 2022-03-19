@@ -22,6 +22,12 @@ import texar.torch as tx
 from tqdm import tqdm
 from ctrl_gen_model_torch import CtrlGenModel
 
+try:
+    import wandb
+except ImportError:
+    wandb = None
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Running PyTorch using {device}")
 
@@ -34,18 +40,50 @@ def main():
     parser.add_argument('--dataset',
                         help='The name of the dataset to use.',
                         required=True)
+    parser.add_argument('--base-path',
+                        help='base path for the dataset dir',
+                        default='./personality_transfer_model/data')
+    parser.add_argument('--trait',
+                        help='The traits to use as classification',
+                        choices=['OPN', 'CON', 'EXT', 'AGR', 'NEU'],
+                        required=True)
     parser.add_argument('--load-checkpoint',
                         help='Whether to start again from the last checkpoint',
                         action='store_true')
     args = parser.parse_args()
     config = importlib.import_module(args.config)
+    config.model = config.tf_config2torch(config.model)
+
+    if wandb is not None:
+        wandb.init(project="personality-transfer",
+                   entity="galatoloa",
+                   config=config.model)
+        config = wandb.config
+    else:
+        config = tx.HParams(config.model, None)
     checkpoint_path = os.path.join(config.checkpoint_path, 'ckpt.pth')
 
-    os.makedirs(config.sample_path, exist_ok=True)
     os.makedirs(config.checkpoint_path, exist_ok=True)
 
     # Data
-    train_data = tx.data.MultiAlignedData(config.train_data(args.dataset),
+    dataset_config = {
+        'batch_size': config.batch_size,
+        'seed': config.seed,
+        'datasets': [
+            {
+                'files': f'./personality_transfer_model/data/{args.dataset}/text',
+                'vocab_file': f'./personality_transfer_model/data/{args.dataset}/vocab',
+                'data_name': ''
+            },
+            {
+                'files': f'./personality_transfer_model/data/{args.dataset}/labels_{args.trait}',
+                'data_name': 'labels',
+                'data_type': 'int'
+            }
+        ],
+        'name': 'train'
+    }
+    train_data = tx.data.MultiAlignedData(dataset_config,
                                           device=device)
     vocab = train_data.vocab(0)
 
@@ -60,7 +98,7 @@ def main():
     gamma_decay = config.gamma_decay
 
     model = CtrlGenModel(input_len, vocab,
-                         config.model, device).to(device)
+                         config, device).to(device)
 
     optim_g = tx.core.get_optimizer(model.g_params(),
                                     hparams=model._hparams.opt)
@@ -79,8 +117,7 @@ def main():
     train_g = tx.core.get_train_op(optimizer=optim_g)
     train_d = tx.core.get_train_op(optimizer=optim_d)
 
-    gamma_0 = 1.
-    gamma = gamma_0
+    gamma = config.gamma
     lambda_g = 0.
 
     print(f'Starting training from epoch {initial_epoch}')
@@ -95,7 +132,7 @@ def main():
 
         if epoch > config.pretrain_nepochs:
             # Anneals the gumbel-softmax temperature
-            gamma = max(0.001, gamma_0 * (gamma_decay ** (epoch-config.pretrain_nepochs)))
+            gamma = max(0.001, config.gamma * (gamma_decay ** (epoch-config.pretrain_nepochs)))
         print(f'gamma: {gamma}, lambda_g: {lambda_g}')
 
         avg_meters_d = tx.utils.AverageRecorder(size=10)
@@ -116,6 +153,9 @@ def main():
             avg_meters_g.add(accu_g)
             data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
                                           + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
+            if wandb is not None:
+                wandb.log({'Accuracy D': avg_meters_d.to_str(precision=4),
+                           'Accuracy G': avg_meters_g.to_str(precision=4)})
 
         torch.save({'model_state_dict': model.state_dict(),
                     'optim_d': optim_d.state_dict(),
@@ -124,7 +164,7 @@ def main():
                    checkpoint_path)
     torch.save({'model_state_dict': model.state_dict(),
                 'input_len': input_len,
-                'vocab_file': config.train_data(args.dataset)['datasets'][0]['vocab_file']},
+                'vocab_file': dataset_config['datasets'][0]['vocab_file']},
                os.path.join(config.checkpoint_path, 'final_model.pth'))
 
 

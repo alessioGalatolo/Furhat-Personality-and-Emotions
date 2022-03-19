@@ -10,8 +10,7 @@ from texar.torch.modules import WordEmbedder, UnidirectionalRNNEncoder, \
 class CtrlGenModel(nn.Module):
     def __init__(self, input_len, vocab, hparams, device):
         super().__init__()
-        self._hparams = tx.HParams(CtrlGenModel.tf_config2torch(hparams),
-                                   None)
+        self._hparams = hparams
         self.vocab = vocab
         self.embedder = WordEmbedder(
             vocab_size=vocab.size,
@@ -70,7 +69,7 @@ class CtrlGenModel(nn.Module):
             return loss_d_clas, clas_preds
         return clas_preds
 
-    def forward_g(self, inputs, mode, gamma=1, lambda_g=0):  # FIXME
+    def forward_g(self, inputs, mode, gamma, lambda_g):
         # text_ids for encoder, with BOS token removed
         enc_text_ids = inputs['text_ids'][:, 1:]
         enc_outputs, final_state = self.encoder(self.embedder(enc_text_ids),
@@ -165,22 +164,8 @@ class CtrlGenModel(nn.Module):
         clas_preds = self.forward_d(inputs, mode='eval')
         inputs['labels'] = clas_preds
         if clas_preds.item() != transfer_clas:
-            output_ids = self.forward_g(inputs, mode='eval').sample_id[0]
+            output_ids = self.forward_g(inputs, 'eval', self._hparams.gamma, self._hparams.lambda_g).sample_id[0]
         else:
             output_ids = text_ids
 
         return output_ids
-
-    @staticmethod
-    def tf_config2torch(model_config):
-        # Convert config options from tf to torch syntax
-        if model_config['opt']['optimizer']['type'] == 'AdamOptimizer':
-            model_config['opt']['optimizer']['type'] = 'Adam'
-        if 'learning_rate' in model_config['opt']['optimizer']['kwargs']:
-            lr = model_config['opt']['optimizer']['kwargs'].pop('learning_rate')
-            model_config['opt']['optimizer']['kwargs']['lr'] = lr
-        if 'filters' in model_config['classifier']:
-            filters = model_config['classifier'].pop('filters')
-            model_config['classifier']['out_channels'] = filters
-            model_config['classifier']['data_format'] = 'channels_last'
-        return model_config
