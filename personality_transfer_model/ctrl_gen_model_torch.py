@@ -10,7 +10,6 @@ from texar.torch.modules import WordEmbedder, UnidirectionalRNNEncoder, \
 class CtrlGenModel(nn.Module):
     def __init__(self, input_len, vocab, hparams, device):
         super().__init__()
-        self.input_len = input_len  # FIXME
         self._hparams = tx.HParams(CtrlGenModel.tf_config2torch(hparams),
                                    None)
         self.vocab = vocab
@@ -71,7 +70,7 @@ class CtrlGenModel(nn.Module):
             return loss_d_clas, clas_preds
         return clas_preds
 
-    def forward_g(self, inputs, mode, gamma=None, lambda_g=None):
+    def forward_g(self, inputs, mode, gamma=1, lambda_g=0):  # FIXME
         # text_ids for encoder, with BOS token removed
         enc_text_ids = inputs['text_ids'][:, 1:]
         enc_outputs, final_state = self.encoder(self.embedder(enc_text_ids),
@@ -84,19 +83,20 @@ class CtrlGenModel(nn.Module):
         h = torch.concat([c, z], dim=1)
         h_ = torch.concat([c_, z], dim=1)
 
-        g_outputs, _, _ = self.decoder(
-            memory=enc_outputs,
-            memory_sequence_length=inputs['length'] - 1,
-            initial_state=self.connector(h),
-            inputs=inputs['text_ids'],
-            sequence_length=inputs['length'] - 1)
+        if mode == 'train':
+            g_outputs, _, _ = self.decoder(
+                memory=enc_outputs,
+                memory_sequence_length=inputs['length'] - 1,
+                initial_state=self.connector(h),
+                inputs=inputs['text_ids'],
+                sequence_length=inputs['length'] - 1)
 
-        loss_g_ae = tx.losses.sequence_sparse_softmax_cross_entropy(
-            labels=inputs['text_ids'][:, 1:],
-            logits=g_outputs.logits,
-            sequence_length=inputs['length'] - 1,
-            average_across_timesteps=True,
-            sum_over_timesteps=False)
+            loss_g_ae = tx.losses.sequence_sparse_softmax_cross_entropy(
+                labels=inputs['text_ids'][:, 1:],
+                logits=g_outputs.logits,
+                sequence_length=inputs['length'] - 1,
+                average_across_timesteps=True,
+                sum_over_timesteps=False)
 
         # Gumbel-softmax decoding, used in training
         start_tokens = torch.ones_like(inputs['labels']) * self.vocab.bos_token_id
@@ -158,21 +158,14 @@ class CtrlGenModel(nn.Module):
         return loss, accu
 
     @torch.no_grad()
-    def infer(self, text, transfer_clas):
+    def infer(self, text_ids, transfer_clas):
         self.eval()
-        text_tokens = text.split()
-        text_tokens.insert(0, self.vocab.bos_token)
-        text_tokens.append(self.vocab.eos_token)
-        if len(text_tokens) < self.input_len:  # FIXME: check length and eventually pad sequence
-            for _ in range(self.classifier.output_size-len(text_tokens)):
-                text_tokens.append('')
-        text_ids = self.vocab.map_tokens_to_ids_py(text_tokens)
         inputs = {'text_ids': torch.Tensor(np.array([text_ids])).long(),
                   'length': torch.Tensor([len(text_ids)]).long()}
         clas_preds = self.forward_d(inputs, mode='eval')
         inputs['labels'] = clas_preds
         if clas_preds.item() != transfer_clas:
-            output_ids = self.forward_g(inputs, mode='eval')
+            output_ids = self.forward_g(inputs, mode='eval').sample_id[0]
         else:
             output_ids = text_ids
 
