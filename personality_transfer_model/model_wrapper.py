@@ -2,13 +2,13 @@ from importlib import import_module
 import os.path as path
 import texar.torch as tx
 import torch
-from ctrl_gen_model_torch import CtrlGenModel
+from ctrl_gen_model import CtrlGenModel
 
 
 class PersonalityTransfer:
     def __init__(self, config_module, device='cpu'):
         config = import_module(config_module)
-        config = tx.HParams(config.tf_config2torch(config.model), None)
+        config = tx.HParams(config.model, None)
         checkpoint_path = path.join(config.checkpoint_path, 'final_model.pth')
         assert path.exists(checkpoint_path)
 

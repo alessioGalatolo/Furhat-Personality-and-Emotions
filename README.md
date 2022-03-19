@@ -1,7 +1,7 @@
 # Emotions on Furhat for now
 
 ## Requirements
-Python > 3.10 and python 3.7 (for tensorflow)
+Python > 3.10 and python 3.7 (for pytorch)
 
 # Datasets
 | Name | Size | Labels | Origin | Method | Reference |

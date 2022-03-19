@@ -1,39 +1,6 @@
 """Config
 """
 
-
-def tf_config2torch(model_config):
-    # Convert config options from tf to torch syntax
-    if model_config['opt']['optimizer']['type'] == 'AdamOptimizer':
-        model_config['opt']['optimizer']['type'] = 'Adam'
-    if 'learning_rate' in model_config['opt']['optimizer']['kwargs']:
-        lr = model_config['opt']['optimizer']['kwargs'].pop('learning_rate')
-        model_config['opt']['optimizer']['kwargs']['lr'] = lr
-    if 'filters' in model_config['classifier']:
-        filters = model_config['classifier'].pop('filters')
-        model_config['classifier']['out_channels'] = filters
-        model_config['classifier']['data_format'] = 'channels_last'
-    return model_config
-
-
-def train_data(dataset):
-    return {
-        'datasets': [
-            {
-                'files': f'./personality_transfer_model/data/{dataset}/text',
-                'vocab_file': f'./personality_transfer_model/data/{dataset}/vocab',
-                'data_name': ''
-            },
-            {
-                'files': f'./personality_transfer_model/data/{dataset}/labels_EXT',
-                'data_name': 'labels',
-                'data_type': 'int'
-            }
-        ],
-        'name': 'train'
-    }
-
-
 model = {
     'batch_size': 32,
     'seed': 123,
@@ -85,8 +52,9 @@ model = {
     },
     'classifier': {
         'kernel_size': [3, 4, 5],
-        'filters': 128,
+        'out_channels': 128,
         'other_conv_kwargs': {'padding': 'same'},
+        'data_format': 'channels_last',
         'dropout_conv': [1],
         'dropout_rate': 0.5,
         'num_dense_layers': 0,
@@ -94,9 +62,9 @@ model = {
     },
     'opt': {
         'optimizer': {
-            'type':  'AdamOptimizer',
+            'type':  'Adam',
             'kwargs': {
-                'learning_rate': 5e-4,
+                'lr': 5e-4,
             },
         },
     },

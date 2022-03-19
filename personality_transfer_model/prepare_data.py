@@ -19,11 +19,7 @@ from os import makedirs, mkdir, path, rename, listdir
 from re import findall
 import pandas as pd
 from tqdm import tqdm
-
-try:
-    import texar.torch as tx
-except ImportError:
-    import texar.tf as tx
+import texar.torch as tx
 
 
 def prepare_yelp(**kwargs):

@@ -1,183 +1,171 @@
-# Copyright 2018 The Texar Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Text style transfer
-"""
-
-# pylint: disable=invalid-name, too-many-locals
-
-import tensorflow as tf
-
-import texar.tf as tx
-from texar.tf.modules import WordEmbedder, UnidirectionalRNNEncoder, \
+import numpy as np
+import torch
+from torch import nn
+import texar.torch as tx
+from texar.torch.modules import WordEmbedder, UnidirectionalRNNEncoder, \
         MLPTransformConnector, AttentionRNNDecoder, \
         GumbelSoftmaxEmbeddingHelper, Conv1DClassifier
-from texar.tf.core import get_train_op
-from texar.tf.utils import collect_trainable_variables, get_batch_size
 
 
-class CtrlGenModel(object):
-    """Control
-    """
-
-    def __init__(self, inputs, vocab, gamma, lambda_g, hparams=None):
-        self._hparams = tx.HParams(hparams, None)
-        self._build_model(inputs, vocab, gamma, lambda_g)
-
-    def _build_model(self, inputs, vocab, gamma, lambda_g):
-        """Builds the model.
-        """
-        embedder = WordEmbedder(
+class CtrlGenModel(nn.Module):
+    def __init__(self, input_len, vocab, hparams, device):
+        super().__init__()
+        self._hparams = hparams
+        self.vocab = vocab
+        self.embedder = WordEmbedder(
             vocab_size=vocab.size,
-            hparams=self._hparams.embedder)
-        encoder = UnidirectionalRNNEncoder(hparams=self._hparams.encoder)
-
-        # text_ids for encoder, with BOS token removed
-        enc_text_ids = inputs['text_ids'][:, 1:]
-        enc_outputs, final_state = encoder(embedder(enc_text_ids),
-                                           sequence_length=inputs['length'] - 1)
-        z = final_state[:, self._hparams.dim_c:]
+            hparams=self._hparams.embedder).to(device)
+        self.encoder = UnidirectionalRNNEncoder(input_size=self.embedder.dim,
+                                                hparams=self._hparams.encoder).to(device)
 
         # Encodes label
-        label_connector = MLPTransformConnector(self._hparams.dim_c)
-
-        # Gets the sentence representation: h = (c, z)
-        labels = tf.cast(tf.reshape(inputs['labels'], [-1, 1]), tf.float32)
-        c = label_connector(labels)
-        c_ = label_connector(1 - labels)
-        h = tf.concat([c, z], 1)
-        h_ = tf.concat([c_, z], 1)
+        self.label_connector = MLPTransformConnector(self._hparams.dim_c,
+                                                     linear_layer_dim=1).to(device)
 
         # Teacher-force decoding and the auto-encoding loss for G
-        decoder = AttentionRNNDecoder(
-            memory=enc_outputs,
-            memory_sequence_length=inputs['length'] - 1,
+        self.decoder = AttentionRNNDecoder(
+            encoder_output_size=self.encoder.output_size,
+            input_size=self.embedder.dim,
+            token_embedder=self.embedder,
             cell_input_fn=lambda inputs, attention: inputs,
-            vocab_size=vocab.size,
-            hparams=self._hparams.decoder)
+            vocab_size=self.vocab.size,
+            hparams=self._hparams.decoder).to(device)
 
-        connector = MLPTransformConnector(decoder.state_size)
+        connector_lldim = self._hparams.dim_c + self._hparams.dim_z
+        self.connector = MLPTransformConnector(output_size=self.decoder.output_size,
+                                               linear_layer_dim=connector_lldim).to(device)
+        # Creates classifier
+        self.clas_embedder = WordEmbedder(vocab_size=self.vocab.size,
+                                          hparams=self._hparams.embedder).to(device)
 
-        g_outputs, _, _ = decoder(
-            initial_state=connector(h), inputs=inputs['text_ids'],
-            embedding=embedder, sequence_length=inputs['length'] - 1)
+        self.classifier = Conv1DClassifier(in_features=input_len,
+                                           in_channels=self.embedder.dim,
+                                           hparams=self._hparams.classifier).to(device)
 
-        loss_g_ae = tx.losses.sequence_sparse_softmax_cross_entropy(
-            labels=inputs['text_ids'][:, 1:],
-            logits=g_outputs.logits,
-            sequence_length=inputs['length'] - 1,
-            average_across_timesteps=True,
-            sum_over_timesteps=False)
+    def g_params(self):
+        # do not include embedder since its parameters are present in the decoder
+        g_ = [self.encoder, self.label_connector,
+              self.connector, self.decoder]
+        params = []
+        for model in g_:
+            params += list(model.parameters())
+        return params
+
+    def d_params(self):
+        d_ = [self.clas_embedder, self.classifier]
+        params = []
+        for model in d_:
+            params += list(model.parameters())
+        return params
+
+    def forward_d(self, inputs, mode):
+        # Classification loss for the classifier
+        clas_logits, clas_preds = self.classifier(
+            input=self.clas_embedder(ids=inputs['text_ids'][:, 1:]),
+            sequence_length=inputs['length'] - 1)
+        if mode == 'train':  # check for eval vs train
+            loss_d_clas = nn.functional.binary_cross_entropy_with_logits(
+                input=clas_logits, target=inputs['labels'].to(torch.float32))
+            return loss_d_clas, clas_preds
+        return clas_preds
+
+    def forward_g(self, inputs, mode, gamma, lambda_g):
+        # text_ids for encoder, with BOS token removed
+        enc_text_ids = inputs['text_ids'][:, 1:]
+        enc_outputs, final_state = self.encoder(self.embedder(enc_text_ids),
+                                                sequence_length=inputs['length'] - 1)
+        z = final_state[:, self._hparams.dim_c:]
+
+        labels = inputs['labels'].reshape(-1, 1).to(torch.float32)
+        c = self.label_connector(labels)
+        c_ = self.label_connector(1 - labels)
+        h = torch.concat([c, z], dim=1)
+        h_ = torch.concat([c_, z], dim=1)
+
+        if mode == 'train':
+            g_outputs, _, _ = self.decoder(
+                memory=enc_outputs,
+                memory_sequence_length=inputs['length'] - 1,
+                initial_state=self.connector(h),
+                inputs=inputs['text_ids'],
+                sequence_length=inputs['length'] - 1)
+
+            loss_g_ae = tx.losses.sequence_sparse_softmax_cross_entropy(
+                labels=inputs['text_ids'][:, 1:],
+                logits=g_outputs.logits,
+                sequence_length=inputs['length'] - 1,
+                average_across_timesteps=True,
+                sum_over_timesteps=False)
 
         # Gumbel-softmax decoding, used in training
-        start_tokens = tf.ones_like(inputs['labels']) * vocab.bos_token_id
-        end_token = vocab.eos_token_id
-        gumbel_helper = GumbelSoftmaxEmbeddingHelper(
-            embedder.embedding, start_tokens, end_token, gamma)
+        start_tokens = torch.ones_like(inputs['labels']) * self.vocab.bos_token_id
+        end_token = self.vocab.eos_token_id
+        gumbel_helper = GumbelSoftmaxEmbeddingHelper(start_tokens, end_token, tau=gamma)
+        # gumbel_helper.initialize(self.embedder.embedding) FIXME
 
-        soft_outputs_, _, soft_length_, = decoder(
-            helper=gumbel_helper, initial_state=connector(h_))
+        soft_outputs_, _, soft_length_, = self.decoder(
+            memory=enc_outputs,
+            memory_sequence_length=inputs['length'] - 1,
+            helper=gumbel_helper, initial_state=self.connector(h_))
 
         # Greedy decoding, used in eval
-        outputs_, _, length_ = decoder(
-            decoding_strategy='infer_greedy', initial_state=connector(h_),
-            embedding=embedder, start_tokens=start_tokens, end_token=end_token)
-
-        # Creates classifier
-        classifier = Conv1DClassifier(hparams=self._hparams.classifier)
-        clas_embedder = WordEmbedder(vocab_size=vocab.size,
-                                     hparams=self._hparams.embedder)
-
-        # Classification loss for the classifier
-        clas_logits, clas_preds = classifier(
-            inputs=clas_embedder(ids=inputs['text_ids'][:, 1:]),
-            sequence_length=inputs['length'] - 1)
-        loss_d_clas = tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=tf.cast(inputs['labels'], tf.float32), logits=clas_logits)
-        loss_d_clas = tf.reduce_mean(loss_d_clas)
-        accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
+        outputs_, _, length_ = self.decoder(
+            memory=enc_outputs,
+            memory_sequence_length=inputs['length'] - 1,
+            decoding_strategy='infer_greedy', initial_state=self.connector(h_),
+            start_tokens=start_tokens, end_token=end_token)
+        if mode == 'eval':
+            # Done here
+            return outputs_
 
         # Classification loss for the generator, based on soft samples
-        soft_logits, soft_preds = classifier(
-            inputs=clas_embedder(soft_ids=soft_outputs_.sample_id),
+        soft_logits, soft_preds = self.classifier(
+            input=self.clas_embedder(soft_ids=soft_outputs_.sample_id),
             sequence_length=soft_length_)
-        loss_g_clas = tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=tf.cast(1 - inputs['labels'], tf.float32),
-            logits=soft_logits)
-        loss_g_clas = tf.reduce_mean(loss_g_clas)
-
-        # Accuracy on soft samples, for training progress monitoring
-        accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
-                                   preds=soft_preds)
-
-        # Accuracy on greedy-decoded samples, for training progress monitoring
-        _, gdy_preds = classifier(
-            inputs=clas_embedder(ids=outputs_.sample_id),
-            sequence_length=length_)
-        accu_g_gdy = tx.evals.accuracy(
-            labels=1 - inputs['labels'], preds=gdy_preds)
+        loss_g_clas = nn.functional.binary_cross_entropy_with_logits(
+            input=soft_logits,
+            target=(1 - inputs['labels']).to(torch.float32))
 
         # Aggregates losses
         loss_g = loss_g_ae + lambda_g * loss_g_clas
-        loss_d = loss_d_clas
 
-        # Creates optimizers
-        g_vars = collect_trainable_variables(
-            [embedder, encoder, label_connector, connector, decoder])
-        d_vars = collect_trainable_variables([clas_embedder, classifier])
+        return loss_g, (outputs_, length_, soft_preds)
 
-        train_op_g = get_train_op(
-            loss_g, g_vars, hparams=self._hparams.opt)
-        train_op_g_ae = get_train_op(
-            loss_g_ae, g_vars, hparams=self._hparams.opt)
-        train_op_d = get_train_op(
-            loss_d, d_vars, hparams=self._hparams.opt)
+    def forward(self, inputs, step, mode='train', gamma=None, lambda_g=None):
+        self.train()
+        if step == "g":
+            loss, (outputs_, length_, soft_preds) = self.forward_g(inputs, mode, gamma, lambda_g)
+            with torch.no_grad():
+                # Accuracy on soft samples, for training progress monitoring
+                accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
+                                            preds=soft_preds)
 
-        # Interface tensors
-        self.losses = {
-            "loss_g": loss_g,
-            "loss_g_ae": loss_g_ae,
-            "loss_g_clas": loss_g_clas,
-            "loss_d": loss_d_clas
-        }
-        self.metrics = {
-            "accu_d": accu_d,
-            "accu_g": accu_g,
-            "accu_g_gdy": accu_g_gdy,
-        }
-        self.train_ops = {
-            "train_op_g": train_op_g,
-            "train_op_g_ae": train_op_g_ae,
-            "train_op_d": train_op_d
-        }
-        self.samples = {
-            "original": inputs['text_ids'][:, 1:],
-            "transferred": outputs_.sample_id
-        }
+                # Accuracy on greedy-decoded samples, for training progress monitoring
+                _, gdy_preds = self.classifier(
+                    input=self.clas_embedder(ids=outputs_.sample_id),
+                    sequence_length=length_)
+                accu_g_gdy = tx.evals.accuracy(
+                    labels=1 - inputs['labels'], preds=gdy_preds)
+            accu = [accu_g.detach().cpu(), accu_g_gdy.detach().cpu()]
+        elif step == "d":
+            loss, clas_preds = self.forward_d(inputs, mode)
+            accu_d = tx.evals.accuracy(labels=inputs['labels'], preds=clas_preds)
+            accu = accu_d.detach().cpu()
+        else:
+            ...
 
-        self.fetches_train_g = {
-            "loss_g": self.train_ops["train_op_g"],
-            "loss_g_ae": self.losses["loss_g_ae"],
-            "loss_g_clas": self.losses["loss_g_clas"],
-            "accu_g": self.metrics["accu_g"],
-            "accu_g_gdy": self.metrics["accu_g_gdy"],
-        }
-        self.fetches_train_d = {
-            "loss_d": self.train_ops["train_op_d"],
-            "accu_d": self.metrics["accu_d"]
-        }
-        fetches_eval = {"batch_size": get_batch_size(inputs['text_ids'])}
-        fetches_eval.update(self.losses)
-        fetches_eval.update(self.metrics)
-        fetches_eval.update(self.samples)
-        self.fetches_eval = fetches_eval
+        return loss, accu
+
+    @torch.no_grad()
+    def infer(self, text_ids, transfer_clas):
+        self.eval()
+        inputs = {'text_ids': torch.Tensor(np.array([text_ids])).long(),
+                  'length': torch.Tensor([len(text_ids)]).long()}
+        clas_preds = self.forward_d(inputs, mode='eval')
+        inputs['labels'] = clas_preds
+        if clas_preds.item() != transfer_clas:
+            output_ids = self.forward_g(inputs, 'eval', self._hparams.gamma, self._hparams.lambda_g).sample_id[0]
+        else:
+            output_ids = text_ids
+
+        return output_ids

@@ -1,16 +1,3 @@
-# Copyright 2018 The Texar Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """Text style transfer
 
 This is a simplified implementation of:
@@ -20,172 +7,165 @@ Zhiting Hu, Zichao Yang, Xiaodan Liang, Ruslan Salakhutdinov, Eric Xing
 
 Download the data with the cmd:
 
-$ python prepare_data.py
+$ python prepare_data.py --dataset <dataset>
 
 Train the model with the cmd:
 
-$ python main.py --config config
+$ python train_torch.py --config config --dataset <dataset>
 """
 
-# pylint: disable=invalid-name, too-many-locals, too-many-arguments, no-member
-
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+import argparse
 import importlib
-import numpy as np
-import tensorflow as tf
-import texar.tf as tx
-
+import torch
+import texar.torch as tx
+from tqdm import tqdm
 from ctrl_gen_model import CtrlGenModel
 
-flags = tf.flags
-
-flags.DEFINE_string('config', 'config', 'The config to use.')
-flags.DEFINE_string('dataset', default=None, help='The dataset to use.', required=True)
-
-FLAGS = flags.FLAGS
-
-config = importlib.import_module(FLAGS.config)
+try:
+    import wandb
+except ImportError:
+    wandb = None
 
 
-def _main(_):
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Running PyTorch using {device}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Model for text style transfer')
+    parser.add_argument('--config',
+                        default='config',
+                        help='The config to use.')
+    parser.add_argument('--dataset',
+                        help='The name of the dataset to use.',
+                        required=True)
+    parser.add_argument('--base-path',
+                        help='base path for the dataset dir',
+                        default='./personality_transfer_model/data')
+    parser.add_argument('--trait',
+                        help='The traits to use as classification',
+                        choices=['OPN', 'CON', 'EXT', 'AGR', 'NEU'],
+                        required=True)
+    parser.add_argument('--load-checkpoint',
+                        help='Whether to start again from the last checkpoint',
+                        action='store_true')
+    args = parser.parse_args()
+    config = importlib.import_module(args.config)
+
+    if wandb is not None:
+        wandb.init(project="personality-transfer",
+                   entity="galatoloa",
+                   config=config.model)
+        config = wandb.config
+    else:
+        config = tx.HParams(config.model, None)
+    checkpoint_path = os.path.join(config.checkpoint_path, 'ckpt.pth')
+
+    os.makedirs(config.checkpoint_path, exist_ok=True)
+
     # Data
-    train_data = tx.data.MultiAlignedData(config.train_data(FLAGS.dataset))
-    # val_data = tx.data.MultiAlignedData(config.val_data)
-    # test_data = tx.data.MultiAlignedData(config.test_data)
+    dataset_config = {
+        'batch_size': config.batch_size,
+        'seed': config.seed,
+        'datasets': [
+            {
+                'files': f'./personality_transfer_model/data/{args.dataset}/text',
+                'vocab_file': f'./personality_transfer_model/data/{args.dataset}/vocab',
+                'data_name': ''
+            },
+            {
+                'files': f'./personality_transfer_model/data/{args.dataset}/labels_{args.trait}',
+                'data_name': 'labels',
+                'data_type': 'int'
+            }
+        ],
+        'name': 'train'
+    }
+    train_data = tx.data.MultiAlignedData(dataset_config,
+                                          device=device)
     vocab = train_data.vocab(0)
 
     # Each training batch is used twice: once for updating the generator and
     # once for updating the discriminator. Feedable data iterator is used for
     # such case.
-    iterator = tx.data.FeedableDataIterator(
+    iterator = tx.data.DataIterator(
         {'train_g': train_data, 'train_d': train_data})
-    batch = iterator.get_next()
+    input_len = iterator.get_iterator('train_d').__next__()['text_ids'].size(1)-1
 
     # Model
-    gamma = tf.placeholder(dtype=tf.float32, shape=[], name='gamma')
-    lambda_g = tf.placeholder(dtype=tf.float32, shape=[], name='lambda_g')
-    model = CtrlGenModel(batch, vocab, gamma, lambda_g, config.model)
+    gamma_decay = config.gamma_decay
 
-    def _train_epoch(sess, gamma_, lambda_g_, epoch, verbose=True):
+    model = CtrlGenModel(input_len, vocab,
+                         config, device).to(device)
+
+    optim_g = tx.core.get_optimizer(model.g_params(),
+                                    hparams=model._hparams.opt)
+    optim_d = tx.core.get_optimizer(model.d_params(),
+                                    hparams=model._hparams.opt)
+
+    initial_epoch = 1
+    if args.load_checkpoint:
+        print(f'Restoring checkpoint from {checkpoint_path}')
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optim_g.load_state_dict(checkpoint['optim_g'])
+        optim_d.load_state_dict(checkpoint['optim_d'])
+        initial_epoch = checkpoint['epoch']
+
+    train_g = tx.core.get_train_op(optimizer=optim_g)
+    train_d = tx.core.get_train_op(optimizer=optim_d)
+
+    gamma = config.gamma
+    lambda_g = 0.
+
+    print(f'Starting training from epoch {initial_epoch}')
+
+    # Train
+    for epoch in range(initial_epoch, config.max_nepochs + 1):
+        if epoch == config.pretrain_nepochs+1:
+            lambda_g = config.lambda_g
+            optim_g = tx.core.get_optimizer(model.g_params(),
+                                            hparams=model._hparams.opt)
+            train_g = tx.core.get_train_op(optimizer=optim_g)
+
+        if epoch > config.pretrain_nepochs:
+            # Anneals the gumbel-softmax temperature
+            gamma = max(0.001, config.gamma * (gamma_decay ** (epoch-config.pretrain_nepochs)))
+        print(f'gamma: {gamma}, lambda_g: {lambda_g}')
+
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
+        data_iterator = tqdm(zip(iterator.get_iterator('train_d'),
+                                 iterator.get_iterator('train_g')),
+                             total=int(len(train_data)/train_data.batch_size))
 
-        step = 0
-        while True:
-            try:
-                step += 1
-                feed_dict = {
-                    iterator.handle: iterator.get_handle(sess, 'train_d'),
-                    gamma: gamma_,
-                    lambda_g: lambda_g_
-                }
+        for batch_d, batch_g in data_iterator:
+            loss_d, accu_d = model.forward(batch_d, step='d')
+            loss_d.backward()
+            train_d()
+            avg_meters_d.add(accu_d)
 
-                vals_d = sess.run(model.fetches_train_d, feed_dict=feed_dict)
-                avg_meters_d.add(vals_d)
+            loss_g, accu_g = model.forward(batch_g, step='g', gamma=gamma, lambda_g=lambda_g)
+            loss_g.backward()
+            train_g()
+            avg_meters_g.add(accu_g)
+            data_iterator.set_description(f'Accu_d: {avg_meters_d.to_str(precision=4)}, '
+                                          + f'Accu_g: {avg_meters_g.to_str(precision=4)}')
+            if wandb is not None:
+                wandb.log({'Accuracy D': avg_meters_d.to_str(precision=4),
+                           'Accuracy G': avg_meters_g.to_str(precision=4)})
 
-                feed_dict = {
-                    iterator.handle: iterator.get_handle(sess, 'train_g'),
-                    gamma: gamma_,
-                    lambda_g: lambda_g_
-                }
-                vals_g = sess.run(model.fetches_train_g, feed_dict=feed_dict)
-                avg_meters_g.add(vals_g)
-
-                if verbose and (step == 1 or step % config.display == 0):
-                    print('step: {}, {}'.format(step, avg_meters_d.to_str(4)))
-                    print('step: {}, {}'.format(step, avg_meters_g.to_str(4)))
-
-                if verbose and step % config.display_eval == 0:
-                    iterator.restart_dataset(sess, 'val')
-                    _eval_epoch(sess, gamma_, lambda_g_, epoch)
-
-            except tf.errors.OutOfRangeError:
-                print('epoch: {}, {}'.format(epoch, avg_meters_d.to_str(4)))
-                print('epoch: {}, {}'.format(epoch, avg_meters_g.to_str(4)))
-                break
-
-    def _eval_epoch(sess, gamma_, lambda_g_, epoch, val_or_test='val'):
-        avg_meters = tx.utils.AverageRecorder()
-
-        while True:
-            try:
-                feed_dict = {
-                    iterator.handle: iterator.get_handle(sess, val_or_test),
-                    gamma: gamma_,
-                    lambda_g: lambda_g_,
-                    tx.context.global_mode(): tf.estimator.ModeKeys.EVAL
-                }
-
-                vals = sess.run(model.fetches_eval, feed_dict=feed_dict)
-
-                batch_size = vals.pop('batch_size')
-
-                # Computes BLEU
-                samples = tx.utils.dict_pop(vals, list(model.samples.keys()))
-                hyps = tx.utils.map_ids_to_strs(samples['transferred'], vocab)
-
-                refs = tx.utils.map_ids_to_strs(samples['original'], vocab)
-                refs = np.expand_dims(refs, axis=1)
-
-                bleu = tx.evals.corpus_bleu_moses(refs, hyps)
-                vals['bleu'] = bleu
-
-                avg_meters.add(vals, weight=batch_size)
-
-                # Writes samples
-                tx.utils.write_paired_text(
-                    refs.squeeze(), hyps,
-                    os.path.join(config.sample_path, 'val.%d' % epoch),
-                    append=True, mode='v')
-
-            except tf.errors.OutOfRangeError:
-                print('{}: {}'.format(
-                    val_or_test, avg_meters.to_str(precision=4)))
-                break
-
-        return avg_meters.avg()
-
-    tf.gfile.MakeDirs(config.sample_path)
-    tf.gfile.MakeDirs(config.checkpoint_path)
-
-    # Runs the logics
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer())
-        sess.run(tf.tables_initializer())
-
-        saver = tf.train.Saver(max_to_keep=None)
-        if config.restore:
-            print('Restore from: {}'.format(config.restore))
-            saver.restore(sess, config.restore)
-
-        iterator.initialize_dataset(sess)
-
-        gamma_ = 1.
-        lambda_g_ = 0.
-        for epoch in range(1, config.max_nepochs + 1):
-            if epoch > config.pretrain_nepochs:
-                # Anneals the gumbel-softmax temperature
-                gamma_ = max(0.001, gamma_ * config.gamma_decay)
-                lambda_g_ = config.lambda_g
-            print('gamma: {}, lambda_g: {}'.format(gamma_, lambda_g_))
-
-            # Train
-            iterator.restart_dataset(sess, ['train_g', 'train_d'])
-            _train_epoch(sess, gamma_, lambda_g_, epoch)
-
-            # Val
-            # iterator.restart_dataset(sess, 'val')
-            # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'val')
-
-            saver.save(
-                sess, os.path.join(config.checkpoint_path, 'ckpt'), epoch)
-
-            # # Test
-            # iterator.restart_dataset(sess, 'test')
-            # _eval_epoch(sess, gamma_, lambda_g_, epoch, 'test')
+        torch.save({'model_state_dict': model.state_dict(),
+                    'optim_d': optim_d.state_dict(),
+                    'optim_g': optim_g.state_dict(),
+                    'epoch': epoch},
+                   checkpoint_path)
+    torch.save({'model_state_dict': model.state_dict(),
+                'input_len': input_len,
+                'vocab_file': dataset_config['datasets'][0]['vocab_file']},
+               os.path.join(config.checkpoint_path, 'final_model.pth'))
 
 
 if __name__ == '__main__':
-    tf.app.run(main=_main)
+    main()
