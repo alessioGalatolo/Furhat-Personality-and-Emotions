@@ -157,12 +157,14 @@ class CtrlGenModel(nn.Module):
         return loss, accu
 
     @torch.no_grad()
-    def infer(self, text_ids, transfer_clas):
+    def infer(self, text_ids, transfer_clas=None):
         self.eval()
-        inputs = {'text_ids': torch.Tensor(np.array([text_ids])).long(),
-                  'length': torch.Tensor([len(text_ids)]).long()}
+        inputs = {'text_ids': torch.LongTensor(np.array([text_ids])),
+                  'length': torch.LongTensor([len(text_ids)])}
         clas_preds = self.forward_d(inputs, mode='eval')
         inputs['labels'] = clas_preds
+        if transfer_clas is None:
+            transfer_clas = torch.LongTensor([1 if clas_preds.item() == 0 else 0])
         if clas_preds.item() != transfer_clas:
             output_ids = self.forward_g(inputs, 'eval', self._hparams.gamma, self._hparams.lambda_g).sample_id[0]
         else:
