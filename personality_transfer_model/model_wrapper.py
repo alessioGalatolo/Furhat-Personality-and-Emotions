@@ -23,7 +23,7 @@ class PersonalityTransfer:
                                   self.vocab, config, device)
         self.model.load_state_dict(checkpoint['model_state_dict'], strict=True)
 
-    def transfer(self, text, transfer_clas):
+    def transfer(self, text, transfer_clas=None):
         # FIXME what if the text is not in the vocab?
         # Eval
         text_tokens = text.split()
@@ -43,4 +43,6 @@ class PersonalityTransfer:
 # Testing
 if __name__ == "__main__":
     personality_transfer = PersonalityTransfer('config')
-    print(personality_transfer.transfer("this a not so long text", 0))
+    original_text = "I have the feeling that this thing doesn't work at all ."
+    print(f'Original text: {original_text}')
+    print(f'Transferred text: {personality_transfer.transfer(original_text)}')
