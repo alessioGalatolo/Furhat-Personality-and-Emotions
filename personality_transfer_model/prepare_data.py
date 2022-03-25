@@ -94,7 +94,7 @@ def main():
                     'mbti': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/kaggle/kaggle.csv?raw=true",
                     'personage-data': "http://farm2.user.srcf.net/research/personage/personage-data.tar.gz",
                     'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv",
-                    'yelp': "https://drive.google.com/file/d/'1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing"}
+                    'yelp': "https://drive.google.com/file/d/1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing"}
     DOWNLOAD_IS_COMPRESSED = defaultdict(lambda: False,
                                          [('yelp', True), ('personage-data', True)])
 
