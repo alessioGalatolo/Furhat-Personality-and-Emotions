@@ -6,10 +6,10 @@ from ctrl_gen_model import CtrlGenModel
 
 
 class PersonalityTransfer:
-    def __init__(self, config_module, device='cpu'):
+    def __init__(self, config_module, device='cpu', checkpoint_name='final_model.pth'):
         config = import_module(config_module)
         config = tx.HParams(config.model, None)
-        checkpoint_path = path.join(config.checkpoint_path, 'final_model.pth')
+        checkpoint_path = path.join(config.checkpoint_path, checkpoint_name)
         assert path.exists(checkpoint_path)
 
         checkpoint = torch.load(checkpoint_path)

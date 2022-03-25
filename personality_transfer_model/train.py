@@ -50,6 +50,9 @@ def main():
     parser.add_argument('--offline',
                         help='If true will run wandb offline',
                         action='store_true')
+    parser.add_argument('--save-checkpoints',
+                        help='If true will store checkpoints every 10% of the training process',
+                        action='store_true')
     parser.add_argument('--load-checkpoint',
                         help='Whether to start again from the last checkpoint',
                         action='store_true')
@@ -167,16 +170,22 @@ def main():
                 wandb.log({'Accuracy D': avg_meters_d.avg().item(),
                            'Accuracy G': accu_g,
                            'Accuracy G GDY': accu_g_gdy})
-
-        torch.save({'model_state_dict': model.state_dict(),
-                    'optim_d': optim_d.state_dict(),
-                    'optim_g': optim_g.state_dict(),
-                    'epoch': epoch},
+        model_state = {'model_state_dict': model.state_dict(),
+                       'optim_d': optim_d.state_dict(),
+                       'optim_g': optim_g.state_dict(),
+                       'epoch': epoch}
+        torch.save(model_state,
                    checkpoint_path)
+        if epoch % int(config.max_nepochs / 10) == 0:
+            if args.save_checkpoints:
+                torch.save(model_state,
+                           os.path.join(config.checkpoint_path, f'ckpt_epoch_{epoch}.pth'))
     torch.save({'model_state_dict': model.state_dict(),
                 'input_len': input_len,
+                'dataset': args.dataset,
                 'vocab_file': dataset_config['datasets'][0]['vocab_file']},
                os.path.join(config.checkpoint_path, 'final_model.pth'))
+    os.remove(checkpoint_path)
 
 
 if __name__ == '__main__':
