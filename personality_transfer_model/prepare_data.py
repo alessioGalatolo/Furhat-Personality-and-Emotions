@@ -17,6 +17,7 @@ import argparse
 from collections import defaultdict
 from os import makedirs, mkdir, path, rename, listdir
 from re import findall
+import string
 import pandas as pd
 from tqdm import tqdm
 import texar.torch as tx
@@ -39,6 +40,12 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
     if expand_essays:
         print('Expanding the essays into single sentences, this will probably take a long time...')
         unexpanded_data = data
+        translation_table = defaultdict(lambda: ' ', {ord(letter): letter for letter in string.ascii_letters})
+        translation_table[ord('.')] = ' . '
+        translation_table[ord('?')] = ' ? '
+        translation_table[ord(',')] = ' , '
+        translation_table[ord('!')] = ' ! '
+
         data = pd.DataFrame()
         with open(text_file, "w+") as text:
             data_iterator = unexpanded_data.iterrows()
@@ -49,7 +56,7 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
                 for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
                     for match in sentence:
                         if match and len(match.split()) < max_length:
-                            text.write(match.replace(".", " .").replace("!", " !").replace("?", " ?").strip() + "\n")
+                            text.write(match.translate(translation_table).strip() + "\n")
                     data = data.append(row_data, ignore_index=True)
     else:
         data['text'].to_csv(text_file, index=False, header=False)
