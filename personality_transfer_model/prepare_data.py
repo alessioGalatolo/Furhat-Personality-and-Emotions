@@ -55,8 +55,10 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
                 row_data = {trait: row[1][trait] for trait in traits_labels}
                 for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
                     for match in sentence:
-                        if match and len(match.split()) < max_length:
-                            text.write(match.translate(translation_table).strip() + "\n")
+                        if match:
+                            translated = match.translate(translation_table).strip()
+                            if len(translated.split()) < max_length:
+                                text.write(translated + "\n")
                     data = data.append(row_data, ignore_index=True)
     else:
         data['text'].to_csv(text_file, index=False, header=False)
