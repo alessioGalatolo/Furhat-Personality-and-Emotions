@@ -16,7 +16,7 @@
 import argparse
 from collections import defaultdict
 from os import makedirs, mkdir, path, rename, listdir
-from re import findall
+from re import findall, sub
 import string
 import pandas as pd
 from tqdm import tqdm
@@ -40,11 +40,15 @@ def prepare_ear():
 
 
 def parse_sentence(text, max_length):
+    # remove links
+    text = sub(r'https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)',
+               '', text)
+    # split sentences
     for sentence in findall(r'(".+")|([^.?!]+[.?!])', text):
         for match in sentence:
             if match:
-                translated = match.translate(translation_table).strip()
-                if len(translated.split()) < max_length:
+                translated = sub(r' +', ' ', match.translate(translation_table).strip())
+                if len(translated) > 2 and len(translated.split()) < max_length:
                     yield translated
 
 
@@ -73,8 +77,28 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
         vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
-def prepare_mbti():
-    ...
+def prepare_mbti(base_path, max_length, text_file, label_file, vocab_file, interactive):
+    type2trait = {'I': {'EXT': 0}, 'E': {'EXT': 1}}
+    with open(f"{base_path}/mbti_1.csv", "r") as mbti:
+        data = pd.read_csv(mbti)
+    print('Expanding mbti into single sentences, this will probably take a long time...')
+    unexpanded_data = data
+
+    data = pd.DataFrame()
+    with open(text_file, "w+") as text:
+        data_iterator = unexpanded_data.iterrows()
+        if interactive:
+            data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
+        for row in data_iterator:
+            row_data = type2trait[row[1]['type'][0]]
+            for post in row[1]['posts'].split('|||'):
+                for sentence in parse_sentence(post, max_length):
+                    text.write(sentence + "\n")
+                    data = data.append(row_data, ignore_index=True)
+    data['EXT'].astype(int).to_csv(f'{label_file}_{"EXT"}',
+                                   index=False, header=False)
+    with open(vocab_file, "w+") as vocab:
+        vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
 def prepare_personage_data():
