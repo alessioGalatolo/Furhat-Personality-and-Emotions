@@ -13,10 +13,13 @@ class PersonalityTransfer:
         assert path.exists(checkpoint_path)
 
         checkpoint = torch.load(checkpoint_path)
+        if 'version' not in checkpoint or checkpoint['version'] != 3:
+            print('The checkpoint version is not the latest, please update it with process_checkpoints.py')
+            exit(-1)
         self.input_len = checkpoint['input_len']
 
         # FIXME: should not access that default hparams
-        vocab_hp = tx.HParams({'vocab_file': checkpoint['vocab_file']},
+        vocab_hp = tx.HParams({'vocab_file': f"personality_transfer_model/data/{checkpoint['dataset']}/vocab"},
                               tx.data.data.multi_aligned_data._default_dataset_hparams())
         self.vocab = tx.data.MultiAlignedData.make_vocab([vocab_hp])[0]
         self.model = CtrlGenModel(self.input_len,
