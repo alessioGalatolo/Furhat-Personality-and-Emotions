@@ -22,6 +22,12 @@ import pandas as pd
 from tqdm import tqdm
 import texar.torch as tx
 
+translation_table = defaultdict(lambda: ' ', {ord(letter): letter for letter in string.ascii_letters})
+translation_table[ord('.')] = ' . '
+translation_table[ord('?')] = ' ? '
+translation_table[ord(',')] = ' , '
+translation_table[ord('!')] = ' ! '
+
 
 def prepare_yelp(**kwargs):
     """Downloads data.
@@ -33,35 +39,32 @@ def prepare_ear():
     ...
 
 
-def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, interactive, expand_essays=True):
+def parse_sentence(text, max_length):
+    for sentence in findall(r'(".+")|([^.?!]+[.?!])', text):
+        for match in sentence:
+            if match:
+                translated = match.translate(translation_table).strip()
+                if len(translated.split()) < max_length:
+                    yield translated
+
+
+def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, interactive):
     traits_labels = ['cOPN', 'cCON', 'cEXT', 'cAGR', 'cNEU']
     with open(f"{base_path}/essays", "r") as essays:
         data = pd.read_csv(essays)
-    if expand_essays:
-        print('Expanding the essays into single sentences, this will probably take a long time...')
-        unexpanded_data = data
-        translation_table = defaultdict(lambda: ' ', {ord(letter): letter for letter in string.ascii_letters})
-        translation_table[ord('.')] = ' . '
-        translation_table[ord('?')] = ' ? '
-        translation_table[ord(',')] = ' , '
-        translation_table[ord('!')] = ' ! '
+    print('Expanding the essays into single sentences, this will probably take a long time...')
+    unexpanded_data = data
 
-        data = pd.DataFrame()
-        with open(text_file, "w+") as text:
-            data_iterator = unexpanded_data.iterrows()
-            if interactive:
-                data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
-            for row in data_iterator:
-                row_data = {trait: row[1][trait] for trait in traits_labels}
-                for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
-                    for match in sentence:
-                        if match:
-                            translated = match.translate(translation_table).strip()
-                            if len(translated.split()) < max_length:
-                                text.write(translated + "\n")
-                    data = data.append(row_data, ignore_index=True)
-    else:
-        data['text'].to_csv(text_file, index=False, header=False)
+    data = pd.DataFrame()
+    with open(text_file, "w+") as text:
+        data_iterator = unexpanded_data.iterrows()
+        if interactive:
+            data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
+        for row in data_iterator:
+            row_data = {trait: row[1][trait] for trait in traits_labels}
+            for sentence in parse_sentence(row[1]['text'], max_length):
+                text.write(sentence + "\n")
+                data = data.append(row_data, ignore_index=True)
     numerical_traits = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
     for trait in traits_labels:
         numerical_traits[trait].to_csv(f'{label_file}_{trait[1:4]}',
