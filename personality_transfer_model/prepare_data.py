@@ -79,7 +79,7 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
 
 def prepare_mbti(base_path, max_length, text_file, label_file, vocab_file, interactive):
     type2trait = {'I': {'EXT': 0}, 'E': {'EXT': 1}}
-    with open(f"{base_path}/mbti_1.csv", "r") as mbti:
+    with open(f"{base_path}/mbti", "r") as mbti:
         data = pd.read_csv(mbti)
     print('Expanding mbti into single sentences, this will probably take a long time...')
     unexpanded_data = data
@@ -91,7 +91,7 @@ def prepare_mbti(base_path, max_length, text_file, label_file, vocab_file, inter
             data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
         for row in data_iterator:
             row_data = type2trait[row[1]['type'][0]]
-            for post in row[1]['posts'].split('|||'):
+            for post in row[1]['text'].split('|||'):
                 for sentence in parse_sentence(post, max_length):
                     text.write(sentence + "\n")
                     data = data.append(row_data, ignore_index=True)
