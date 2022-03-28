@@ -18,6 +18,7 @@ import os
 import argparse
 import importlib
 import torch
+import math
 import texar.torch as tx
 from tqdm import tqdm
 from ctrl_gen_model import CtrlGenModel
@@ -181,7 +182,7 @@ def main():
                     'optim_g': optim_g.state_dict(),
                     'epoch': epoch},
                    checkpoint_path)
-        if epoch % int(config.max_nepochs / 10) == 0:
+        if epoch % math.ceil(config.max_nepochs / 10) == 0:
             if args.save_checkpoints:
                 torch.save(model_state,
                            os.path.join(config.checkpoint_path, f'ckpt_epoch_{epoch}.pth'))
