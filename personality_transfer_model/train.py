@@ -114,6 +114,9 @@ def main():
     optim_d = tx.core.get_optimizer(model.d_params(),
                                     hparams=model._hparams.opt)
 
+    gamma = config.gamma
+    lambda_g = 0.
+
     initial_epoch = 1
     if args.load_checkpoint:
         print(f'Restoring checkpoint from {checkpoint_path}')
@@ -122,12 +125,11 @@ def main():
         optim_g.load_state_dict(checkpoint['optim_g'])
         optim_d.load_state_dict(checkpoint['optim_d'])
         initial_epoch = checkpoint['epoch']+1
+        if initial_epoch > config.pretrain_nepochs+1:
+            lambda_g = config.lambda_g
 
     train_g = tx.core.get_train_op(optimizer=optim_g)
     train_d = tx.core.get_train_op(optimizer=optim_d)
-
-    gamma = config.gamma
-    lambda_g = 0.
 
     print(f'Starting training from epoch {initial_epoch}')
 
