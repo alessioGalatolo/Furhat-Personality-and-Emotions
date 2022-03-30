@@ -121,7 +121,7 @@ def main():
         model.load_state_dict(checkpoint['model_state_dict'])
         optim_g.load_state_dict(checkpoint['optim_g'])
         optim_d.load_state_dict(checkpoint['optim_d'])
-        initial_epoch = checkpoint['epoch']
+        initial_epoch = checkpoint['epoch']+1
 
     train_g = tx.core.get_train_op(optimizer=optim_g)
     train_d = tx.core.get_train_op(optimizer=optim_d)
@@ -143,6 +143,8 @@ def main():
             # Anneals the gumbel-softmax temperature
             gamma = max(0.001, config.gamma * (gamma_decay ** (epoch-config.pretrain_nepochs)))
         print(f'gamma: {gamma}, lambda_g: {lambda_g}')
+        if wandb is not None:
+            wandb.log({'Epoch': epoch, 'gamma': gamma, 'lambda_g': lambda_g})
 
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
@@ -188,7 +190,6 @@ def main():
                            os.path.join(config.checkpoint_path, f'ckpt_epoch_{epoch}.pth'))
     torch.save(model_state,
                os.path.join(config.checkpoint_path, 'final_model.pth'))
-    os.remove(checkpoint_path)
 
 
 if __name__ == '__main__':
