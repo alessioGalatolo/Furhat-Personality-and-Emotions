@@ -6,7 +6,8 @@ import texar.torch as tx
 
 
 class TextDataset(Dataset):
-    def __init__(self, text_filename, label_filename, vocab_filename, seed=None):
+    def __init__(self, text_filename, label_filename, vocab_filename,
+                 seed=None, balance_data=True, balancing_method='undersampling'):
         self.vocab = TextDataset.load_vocab(vocab_filename)
         with open(text_filename, mode='r') as text_file,\
              open(label_filename, 'r') as label_file:
@@ -14,14 +15,19 @@ class TextDataset(Dataset):
             labels = (f'{line[:-1]}' for line in label_file)
             self.text_labels = pd.DataFrame({'text': texts, 'label': labels})
         self.text_labels['label'] = pd.to_numeric(self.text_labels['label'])
-        positive_examples = self.text_labels[self.text_labels['label'] == 1]
-        negative_examples = self.text_labels[self.text_labels['label'] == 0]
-        self.length = min(len(positive_examples), len(negative_examples))
-        positive_examples = positive_examples.sample(frac=1, random_state=seed).reset_index(drop=True)
-        negative_examples = negative_examples.sample(frac=1, random_state=seed).reset_index(drop=True)
-        positive_examples = positive_examples[:self.length]
-        negative_examples = negative_examples[:self.length]
-        self.text_labels = positive_examples.append(negative_examples, ignore_index=True)
+        self.length = len(self.text_labels)
+        if balance_data:
+            if balancing_method == 'undersampling':
+                positive_examples = self.text_labels[self.text_labels['label'] == 1]
+                negative_examples = self.text_labels[self.text_labels['label'] == 0]
+                self.length = min(len(positive_examples), len(negative_examples))
+                positive_examples = positive_examples.sample(frac=1, random_state=seed).reset_index(drop=True)
+                negative_examples = negative_examples.sample(frac=1, random_state=seed).reset_index(drop=True)
+                positive_examples = positive_examples[:self.length]
+                negative_examples = negative_examples[:self.length]
+                self.text_labels = positive_examples.append(negative_examples, ignore_index=True)
+            else:
+                raise NotImplementedError
         self.input_len = 0
         for row in self.text_labels.iterrows():
             self.input_len = max(len(row[1]['text']), self.input_len)
@@ -62,7 +68,6 @@ class TextDataLoader():
         self.dataset = dataset
         self.device = device
         self.batch_size = batch_size
-        self.max_iter = int(len(dataset) / batch_size)
 
     def __iter__(self):
         self.n = 0
@@ -70,7 +75,7 @@ class TextDataLoader():
         return self
 
     def __next__(self):
-        if self.n > self.max_iter:
+        if self.n > len(self.dataset):
             raise StopIteration
 
         text = []
