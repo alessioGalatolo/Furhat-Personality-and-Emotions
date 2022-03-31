@@ -28,9 +28,12 @@ class TextDataset(Dataset):
                 self.text_labels = positive_examples.append(negative_examples, ignore_index=True)
             else:
                 raise NotImplementedError
-        self.input_len = 0
+
+        input_lens = []
         for row in self.text_labels.iterrows():
-            self.input_len = max(len(row[1]['text']), self.input_len)
+            input_lens.append(len(row[1]['text']))
+        self.text_labels['length'] = input_lens
+        self.input_len = self.text_labels['length'].max()
 
     def __len__(self):
         return self.length
