@@ -22,7 +22,7 @@ import math
 import texar.torch as tx
 from tqdm import tqdm
 from ctrl_gen_model import CtrlGenModel
-
+from dataset import TextDataLoader, TextDataset
 try:
     import wandb
 except ImportError:
@@ -75,33 +75,17 @@ def main():
     os.makedirs(config.checkpoint_path, exist_ok=True)
 
     # Data
-    dataset_config = {
-        'batch_size': config.batch_size,
-        'seed': config.seed,
-        'datasets': [
-            {
-                'files': f'{args.base_path}/{args.dataset}/text',
-                'vocab_file': f'{args.base_path}/{args.dataset}/vocab',
-                'data_name': ''
-            },
-            {
-                'files': f'{args.base_path}/{args.dataset}/labels_{args.trait}',
-                'data_name': 'labels',
-                'data_type': 'int'
-            }
-        ],
-        'name': 'train'
-    }
-    train_data = tx.data.MultiAlignedData(dataset_config,
-                                          device=device)
-    vocab = train_data.vocab(0)
+    train_data = TextDataset(f'{args.base_path}/{args.dataset}/text',
+                             f'{args.base_path}/{args.dataset}/labels_{args.trait}',
+                             f'{args.base_path}/{args.dataset}/vocab',
+                             config.seed)
+    iterator = TextDataLoader(train_data, config.batch_size, device)
+    vocab = train_data.vocab
 
     # Each training batch is used twice: once for updating the generator and
     # once for updating the discriminator. Feedable data iterator is used for
     # such case.
-    iterator = tx.data.DataIterator(
-        {'train_g': train_data, 'train_d': train_data})
-    input_len = iterator.get_iterator('train_d').__next__()['text_ids'].size(1)-1
+    input_len = train_data.input_len
 
     # Model
     gamma_decay = config.gamma_decay
@@ -150,19 +134,18 @@ def main():
 
         avg_meters_d = tx.utils.AverageRecorder(size=10)
         avg_meters_g = tx.utils.AverageRecorder(size=10)
-        data_iterator = zip(iterator.get_iterator('train_d'),
-                            iterator.get_iterator('train_g'))
+        data_iterator = iterator
         if wandb is None or args.offline:
             data_iterator = tqdm(data_iterator,
-                                 total=int(len(train_data)/train_data.batch_size))
+                                 total=int(len(train_data)/config.batch_size))
 
-        for batch_d, batch_g in data_iterator:
-            loss_d, accu_d = model.forward(batch_d, step='d')
+        for batch in data_iterator:
+            loss_d, accu_d = model.forward(batch, step='d')
             loss_d.backward()
             train_d()
             avg_meters_d.add(accu_d)
 
-            loss_g, accu_g = model.forward(batch_g, step='g', gamma=gamma, lambda_g=lambda_g)
+            loss_g, accu_g = model.forward(batch, step='g', gamma=gamma, lambda_g=lambda_g)
             loss_g.backward()
             train_g()
             avg_meters_g.add(accu_g)
