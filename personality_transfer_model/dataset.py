@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -39,17 +40,15 @@ class TextDataset(Dataset):
         return self.length
 
     def __getitem__(self, index):
-        text = self.text_labels[index: index+1]['text'][index]
+        text = self.text_labels[index: index+1]['text'][index].copy()
         length = self.text_labels[index: index+1]['length'][index]
-        for _ in range(self.input_len-len(text)):
-            text.append('')
         label = self.text_labels[index: index+1]['label'][index]
-        text_ids = TextDataset.text2ids(text, self.vocab, self.input_len)
+        text_ids = TextDataset.text2ids(text, self.vocab)
         return {'text': text, 'text_ids': text_ids,
                 'label': label, 'length': length}
 
     @staticmethod
-    def text2ids(text_tokens, vocab, input_len):
+    def text2ids(text_tokens, vocab, input_len=0):
         if text_tokens[0] != vocab.bos_token:
             text_tokens.insert(0, vocab.bos_token)
         if text_tokens[-1] != vocab.eos_token and text_tokens[-1] != '':
@@ -92,9 +91,13 @@ class TextDataLoader():
             text_ids.append(row['text_ids'])
             labels.append(row['label'])
             length.append(row['length'])
+        text_ids = np.array(list(itertools.zip_longest(*text_ids,
+                                                       fillvalue=self.dataset.vocab.unk_token_id))).T
+        result = {'text': list(map(list,
+                                   zip(*list(itertools.zip_longest(*text,
+                                                                   fillvalue=''))))),
+                  'text_ids': torch.LongTensor(text_ids).to(self.device),
+                  'labels': torch.LongTensor(labels).to(self.device),
+                  'length': torch.LongTensor(length).to(self.device)}
         self.n += self.batch_size
-        return {'text': text,
-                'text_ids': torch.LongTensor(np.array(text_ids)).to(self.device),
-                'labels': torch.LongTensor(labels).to(self.device),
-                'length': torch.LongTensor(length).to(self.device),
-                }
+        return result
