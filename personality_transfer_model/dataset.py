@@ -27,6 +27,7 @@ class TextDataset(Dataset):
                 positive_examples = positive_examples[:self.length]
                 negative_examples = negative_examples[:self.length]
                 self.text_labels = positive_examples.append(negative_examples, ignore_index=True)
+                self.length *= 2
             else:
                 raise NotImplementedError
 
@@ -86,7 +87,7 @@ class TextDataLoader():
         labels = []
         length = []
         for i in range(self.n, self.n+self.batch_size):
-            row = self.dataset[i]
+            row = self.dataset[self.idx_perm[i].item()]
             text.append(row['text'])
             text_ids.append(row['text_ids'])
             labels.append(row['label'])
