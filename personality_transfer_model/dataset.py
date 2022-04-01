@@ -33,19 +33,20 @@ class TextDataset(Dataset):
         for row in self.text_labels.iterrows():
             input_lens.append(len(row[1]['text']))
         self.text_labels['length'] = input_lens
-        self.input_len = self.text_labels['length'].max()
+        self.input_len = self.text_labels['length'].max() - 1
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, index):
         text = self.text_labels[index: index+1]['text'][index]
+        length = self.text_labels[index: index+1]['length'][index]
         for _ in range(self.input_len-len(text)):
             text.append('')
         label = self.text_labels[index: index+1]['label'][index]
         text_ids = TextDataset.text2ids(text, self.vocab, self.input_len)
         return {'text': text, 'text_ids': text_ids,
-                'label': label, 'length': len(text)}
+                'label': label, 'length': length}
 
     @staticmethod
     def text2ids(text_tokens, vocab, input_len):
@@ -53,8 +54,8 @@ class TextDataset(Dataset):
             text_tokens.insert(0, vocab.bos_token)
         if text_tokens[-1] != vocab.eos_token and text_tokens[-1] != '':
             text_tokens.append(vocab.eos_token)
-        if len(text_tokens) < input_len:
-            for _ in range(input_len-len(text_tokens)):
+        if len(text_tokens) < input_len+1:
+            for _ in range(input_len-len(text_tokens)+1):
                 text_tokens.append('')
         text_ids = vocab.map_tokens_to_ids_py(text_tokens)
         return text_ids
