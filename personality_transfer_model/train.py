@@ -22,7 +22,7 @@ import math
 import texar.torch as tx
 from tqdm import tqdm
 from ctrl_gen_model import CtrlGenModel
-from dataset import TextDataLoader, TextDataset
+from dataset import MultiTextDataLoader, TextDataset
 try:
     import wandb
 except ImportError:
@@ -77,9 +77,13 @@ def main():
     # Data
     train_data = TextDataset(f'{args.base_path}/{args.dataset}/text',
                              f'{args.base_path}/{args.dataset}/labels_{args.trait}',
-                             f'{args.base_path}/{args.dataset}/vocab',
-                             config.seed)
-    iterator = TextDataLoader(train_data, config.batch_size, device)
+                             f'{args.base_path}/{args.dataset}/vocab')
+    train_data_unbalanced = TextDataset(f'{args.base_path}/{args.dataset}/text',
+                                        f'{args.base_path}/{args.dataset}/labels_{args.trait}',
+                                        f'{args.base_path}/{args.dataset}/vocab',
+                                        balance_data=False)
+    iterator = MultiTextDataLoader([train_data, train_data_unbalanced],
+                                   config.batch_size, device)
     vocab = train_data.vocab
 
     # Each training batch is used twice: once for updating the generator and
@@ -137,15 +141,16 @@ def main():
         data_iterator = iterator
         if wandb is None or args.offline:
             data_iterator = tqdm(data_iterator,
-                                 total=int(len(train_data)/config.batch_size))
+                                 total=int(len(train_data_unbalanced)/config.batch_size))
 
-        for batch in data_iterator:
-            loss_d, accu_d = model.forward(batch, step='d')
-            loss_d.backward()
-            train_d()
-            avg_meters_d.add(accu_d)
+        for batch_d, batch_g in data_iterator:
+            if batch_d is not None:
+                loss_d, accu_d = model.forward(batch_d, step='d')
+                loss_d.backward()
+                train_d()
+                avg_meters_d.add(accu_d)
 
-            loss_g, accu_g = model.forward(batch, step='g', gamma=gamma, lambda_g=lambda_g)
+            loss_g, accu_g = model.forward(batch_g, step='g', gamma=gamma, lambda_g=lambda_g)
             loss_g.backward()
             train_g()
             avg_meters_g.add(accu_g)

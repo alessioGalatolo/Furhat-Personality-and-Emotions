@@ -68,19 +68,23 @@ class TextDataset(Dataset):
 
 
 class TextDataLoader():
-    def __init__(self, dataset, batch_size, device):
+    def __init__(self, dataset, batch_size, device, seed=None):
         self.dataset = dataset
         self.device = device
         self.batch_size = batch_size
+        self.random_generator = torch.Generator()
+        if seed is not None:
+            self.random_generator.manual_seed(seed)
 
     def __iter__(self):
         self.n = 0
-        self.idx_perm = torch.randperm(len(self.dataset))
+        self.idx_perm = torch.randperm(len(self.dataset),
+                                       generator=self.random_generator)
         return self
 
     def __next__(self):
-        if self.n > len(self.dataset):
-            raise StopIteration
+        if self.n+self.batch_size > len(self.dataset):
+            raise StopIteration  # FIXME: is skipping the last part
 
         text = []
         text_ids = []
@@ -102,3 +106,45 @@ class TextDataLoader():
                   'length': torch.LongTensor(length).to(self.device)}
         self.n += self.batch_size
         return result
+
+
+class MultiTextDataLoader():
+    def __init__(self, datasets, batch_size, device):
+        self.dataloaders = []
+        for dataset in sorted(datasets, key=lambda x: len(x)):
+            self.dataloaders.append(TextDataLoader(dataset, batch_size, device))
+        self.lengths = [len(dataset) for dataset in datasets]
+
+    def __iter__(self):
+        self.data_iterators = []
+        self.none_iterators = []
+        previous_len = self.lengths[0]
+        self.idx_perms = [torch.randperm(previous_len)]
+        for length in self.lengths[1:]:
+            self.idx_perms.append(torch.randperm(length-previous_len)+previous_len)
+        idx_perm = self.idx_perms.pop(0)
+        for dataloader in self.dataloaders:
+            iterator = dataloader.__iter__()
+            iterator.idx_perm = idx_perm
+            self.data_iterators.append(iterator)
+
+        return self
+
+    def __next__(self):
+        result = []
+        for iterator in self.data_iterators:
+            try:
+                result.append(iterator.__next__())
+            except StopIteration:
+                if len(self.data_iterators) == 1:
+                    raise StopIteration
+                self.data_iterators.remove(iterator)
+                self.none_iterators.append(None)
+                idx_perm = self.idx_perms.pop(0)
+                idx_perm = torch.cat((iterator.idx_perm, idx_perm))
+                for iterator in self.data_iterators:
+                    iterator.idx_perm = idx_perm
+                return self.__next__()
+        none_list = self.none_iterators.copy()
+        none_list.extend(result)
+        return none_list
