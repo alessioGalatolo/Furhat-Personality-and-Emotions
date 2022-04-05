@@ -39,7 +39,7 @@ def prepare_ear():
     ...
 
 
-def parse_sentence(text, max_length):
+def parse_sentence(text, max_length=None):
     # remove links
     text = sub(r'https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)',
                '', text)
@@ -48,8 +48,9 @@ def parse_sentence(text, max_length):
         for match in sentence:
             if match:
                 translated = sub(r' +', ' ', match.translate(translation_table).strip())
-                if len(translated) > 2 and len(translated.split()) < max_length:
-                    yield translated
+                if len(translated) > 2:
+                    if max_length is None or len(translated.split()) < max_length:
+                        yield translated
 
 
 def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, interactive):

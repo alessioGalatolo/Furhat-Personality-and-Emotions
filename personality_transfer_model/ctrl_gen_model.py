@@ -171,3 +171,11 @@ class CtrlGenModel(nn.Module):
             output_ids = text_ids
 
         return output_ids
+
+    @torch.no_grad()
+    def classify(self, text_ids):
+        self.eval()
+        inputs = {'text_ids': torch.LongTensor(np.array([text_ids])),
+                  'length': torch.LongTensor([len(text_ids)])}
+        clas_preds = self.forward_d(inputs, mode='eval')
+        return clas_preds.item()

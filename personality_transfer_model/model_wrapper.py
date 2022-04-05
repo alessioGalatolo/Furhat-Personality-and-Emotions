@@ -3,7 +3,8 @@ import os.path as path
 import texar.torch as tx
 import torch
 from ctrl_gen_model import CtrlGenModel
-from personality_transfer_model.dataset import TextDataset
+from dataset import TextDataset
+from prepare_data import parse_sentence
 
 
 class PersonalityTransfer:
@@ -27,18 +28,32 @@ class PersonalityTransfer:
     def transfer(self, text, transfer_clas=None):
         # FIXME what if the text is not in the vocab?
         # Eval
-        text_tokens = text.split()
-        text_ids = TextDataset.text2ids(text_tokens, self.vocab, self.input_len)
-        output_ids = self.model.infer(text_ids, transfer_clas)
+        text += ' .'
+        results = []
+        for sentence in parse_sentence(text):
+            text_tokens = sentence.split()
+            text_ids = TextDataset.text2ids(text_tokens, self.vocab, self.input_len)
+            output_ids = self.model.infer(text_ids, transfer_clas)
 
-        hyps = self.vocab.map_ids_to_tokens_py(output_ids)
-        output_str = ' '.join(hyps.tolist())
-        return output_str
+            hyps = self.vocab.map_ids_to_tokens_py(output_ids)
+            output_str = ' '.join(hyps.tolist())
+            results.append(output_str)
+        return results
+
+    def classify(self, text):
+        text += ' .'
+        class_counter = {}
+        for sentence in parse_sentence(text):
+            text_tokens = sentence.split()
+            text_ids = TextDataset.text2ids(text_tokens, self.vocab, self.input_len)
+            clas = self.model.classify(text_ids)
+            class_counter[clas] = class_counter[clas]+1 if clas in class_counter else 1
+        return max(class_counter, key=class_counter.get)
 
 
 # Testing
 if __name__ == "__main__":
     personality_transfer = PersonalityTransfer('config', checkpoint_name='ckpt_epoch_6.pth')
-    original_text = "I m not even sure if this thing works better than the other ."
+    original_text = "This is so important to keep reminding our fellow citizens:"
     print(f'Original text: {original_text}')
-    print(f'Transferred text: {personality_transfer.transfer(original_text)}')
+    print(f'Transferred text: {personality_transfer.classify(original_text)}')
