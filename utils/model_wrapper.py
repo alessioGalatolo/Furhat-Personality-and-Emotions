@@ -2,9 +2,9 @@ from importlib import import_module
 import os.path as path
 import texar.torch as tx
 import torch
-from ctrl_gen_model import CtrlGenModel
-from dataset import TextDataset
-from prepare_data import parse_sentence
+from utils.ctrl_gen_model import CtrlGenModel
+from utils.dataset import TextDataset
+from utils.prepare_data import parse_sentence
 
 
 class PersonalityTransfer:
@@ -20,7 +20,7 @@ class PersonalityTransfer:
             exit(-1)
         self.input_len = checkpoint['input_len']
 
-        self.vocab = TextDataset.load_vocab(f"personality_transfer_model/data/{checkpoint['dataset']}/vocab")
+        self.vocab = TextDataset.load_vocab(f"utils/data/{checkpoint['dataset']}/vocab")
         self.model = CtrlGenModel(self.input_len,
                                   self.vocab, config, device)
         self.model.load_state_dict(checkpoint['model_state_dict'], strict=True)
