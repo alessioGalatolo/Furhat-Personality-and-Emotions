@@ -149,6 +149,7 @@ for go in range(i):
         text = preprocess_text(tweet['data']['text'])
         try:
             label = personality_classifier.classify(text)
+            label = 'ext' if label == 1 else 'int'
             text_labels.append({'text': text, 'label': label})
         except ValueError:
             print(f'Text "{text}" could not be classified, skipping it')
@@ -160,9 +161,9 @@ val_test = data.drop(train.index)
 val = val_test.sample(frac=0.5)
 test = val_test.drop(val.index)
 
-train['text'].to_csv("train.text", index=False, header=False)
-val['text'].to_csv("val.text", index=False, header=False)
-test['text'].to_csv("test.text", index=False, header=False)
+train['text'].to_csv("train.txt", index=False, header=False)
+val['text'].to_csv("dev.txt", index=False, header=False)
+test['text'].to_csv("test.txt", index=False, header=False)
 train['label'].to_csv("train.label", index=False, header=False)
-val['label'].to_csv("val.label", index=False, header=False)
+val['label'].to_csv("dev.label", index=False, header=False)
 test['label'].to_csv("test.label", index=False, header=False)
