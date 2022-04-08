@@ -9,12 +9,13 @@ from utils.prepare_data import parse_sentence
 
 class PersonalityTransfer:
     def __init__(self, config_module, device='cpu', checkpoint_name='final_model.pth'):
+        device = torch.device(device)
         config = import_module(config_module)
         config = tx.HParams(config.model, None)
         checkpoint_path = path.join(config.checkpoint_path, checkpoint_name)
         assert path.exists(checkpoint_path)
 
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
         if 'version' not in checkpoint or checkpoint['version'] != 3:
             print('The checkpoint version is not the latest, please update it with process_checkpoints.py')
             exit(-1)
