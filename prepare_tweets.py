@@ -147,8 +147,12 @@ for go in range(i):
     tweets = client.get_tweets(id_batch)[0]
     for tweet in tweets:
         text = preprocess_text(tweet['data']['text'])
-        label = personality_classifier.classify(text)
-        text_labels.append({'text': text, 'label': label})
+        try:
+            label = personality_classifier.classify(text)
+            text_labels.append({'text': text, 'label': label})
+        except ValueError:
+            print(f'Text "{text}" could not be classified, skipping it')
+
 data = pd.DataFrame(text_labels)
 
 train = data.sample(frac=0.8)
