@@ -53,7 +53,6 @@ style-venv
 
 .vscode
 runs/
-datasets/
 
 outputs/formality_backup
 outputs/baselines/dlsm_formality
