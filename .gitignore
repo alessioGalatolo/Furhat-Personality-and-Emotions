@@ -4,8 +4,13 @@
 
 __pycache__
 
-data/
 
 checkpoints/
 
 wandb
+
+*.txt
+*.text
+*.label
+*.tsv
+utils/data
