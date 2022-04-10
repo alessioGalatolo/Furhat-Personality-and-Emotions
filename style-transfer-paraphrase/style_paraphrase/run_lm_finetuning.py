@@ -429,7 +429,7 @@ def main():
             os.makedirs(output_dir)
         save_model(gpt2_model, output_dir, args, global_step, tokenizer)
 
-        gpt2_model, tokenizer = init_gpt2_model(checkpoint_dir=args.output_dir,
+        gpt2_model, tokenizer = init_gpt2_model(checkpoint_dir=output_dir,
                                                 args=args,
                                                 model_class=model_class,
                                                 tokenizer_class=tokenizer_class)

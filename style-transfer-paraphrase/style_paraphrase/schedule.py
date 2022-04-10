@@ -106,9 +106,9 @@ for combo in combinations:
 
 # schedule jobs
 for script in scripts:
-    command = "sbatch %s" % script
+    command = "./%s" % script
     print(subprocess.check_output(command, shell=True))
 
 for script in eval_scripts:
-    command = "sbatch %s" % script
+    command = "./%s" % script
     print(subprocess.check_output(command, shell=True))
