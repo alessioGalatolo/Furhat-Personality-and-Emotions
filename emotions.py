@@ -27,17 +27,28 @@ class EmotionGenerator():
     NRC2LED = {'disgust': 'green', 'fear': 'purple',
                'joy': 'yellow', 'anger': 'red', 'sadness': 'blue'}
 
-    def __init__(self, nrc_path='./data/nrc_lexicon'):
-        nrc_lexicon = pd.read_excel(os.path.join(nrc_path, 'NRC-Emotion-Lexicon.xlsx'))
-        self.word2emotion = defaultdict(lambda: [])
-        print('Processing emotions vocabulary...')
-        for row in tqdm(nrc_lexicon.iterrows(), total=nrc_lexicon.shape[0]):
-            emotions = []
-            for emotion in row[1].keys():
-                if row[1][emotion] == 1:
-                    emotions.append(emotion.lower())
-            self.word2emotion[row[1]['Word']] = emotions
-        del nrc_lexicon
+    def __init__(self, emotion_recognizer='HuggingFace', nrc_path='./data/nrc_lexicon'):
+        if emotion_recognizer == "nrc":
+            nrc_lexicon = pd.read_excel(os.path.join(nrc_path, 'NRC-Emotion-Lexicon.xlsx'))
+            self.word2emotion = defaultdict(lambda: [])
+            print('Processing emotions vocabulary...')
+            nrc_lexicon = nrc_lexicon.drop(['Positive', 'Negative'], axis=1)
+            for row in tqdm(nrc_lexicon.iterrows(), total=nrc_lexicon.shape[0]):
+                emotions = []
+                for emotion in row[1].keys():
+                    if row[1][emotion] == 1:
+                        emotions.append(emotion.lower())
+                self.word2emotion[row[1]['Word']] = emotions
+            del nrc_lexicon
+            self.text2emotion = self._nrc_text2emotion
+        elif emotion_recognizer == "HuggingFace":
+            from transformers import pipeline
+            self.emotion_classifier = pipeline("text-classification",
+                                               model="j-hartmann/emotion-english-roberta-large",
+                                               return_all_scores=True)
+            self.text2emotion = self._hf_text2emotion
+        else:
+            raise NotImplementedError
 
     def animate_dialogue(self, furhat, text, length_threshold=10, use_led=True):
         """
@@ -68,22 +79,26 @@ class EmotionGenerator():
         emotions = self.text2emotion(text)
         if use_led:
             for emotion in emotions:
-                if emotion in EmotionGenerator.NRC2LED:
-                    rgb = name_to_rgb(EmotionGenerator.NRC2LED[emotion])
+                if emotion['label'] in EmotionGenerator.NRC2LED:
+                    rgb = name_to_rgb(EmotionGenerator.NRC2LED[emotion['label']])
                     furhat.set_led(red=rgb[0], green=rgb[1], blue=rgb[2])
                     break
-        for i, emotion in enumerate(emotions):
-            print(f'Recognized emotion {emotion}')
-            if emotion not in EmotionGenerator.NRC2GESTURE:
+        for emotion in emotions:
+            if emotion['label'] not in EmotionGenerator.NRC2GESTURE:
                 continue  # TODO
-            gesture = self.get_gesture(EmotionGenerator.NRC2GESTURE[emotion], intensity=2**-(i+1))
+            gesture = self.get_gesture(EmotionGenerator.NRC2GESTURE[emotion['label']],
+                                       intensity=emotion['score'])
             furhat.gesture(**gesture)
         furhat.say(text=text, async_req=False, blocking=True)
         furhat.gesture(**self.get_gesture(EmotionGenerator.Emotions.NEUTRAL, intensity=1))
         if use_led:
             furhat.set_led()  # reset color
 
-    def text2emotion(self, text):
+    def _hf_text2emotion(self, text):
+        result = self.emotion_classifier(text)
+        return sorted(result[0], key=lambda x: -x['score'])
+
+    def _nrc_text2emotion(self, text):
         emotions_detected = {}
         for word in text.split():
             for emotion in self.word2emotion[word.lower()]:
@@ -91,16 +106,9 @@ class EmotionGenerator():
                     emotions_detected[emotion] = 0
                 emotions_detected[emotion] += 1
         emotions_sorted = sorted(emotions_detected.items(), key=lambda item: -item[1])
-        emotions = [emo[0] for emo in emotions_sorted]
-        positive = emotions_detected.pop('positive') if 'positive' in emotions_detected else 0
-        negative = emotions_detected.pop('negative') if 'negative' in emotions_detected else 0
-        try:
-            if positive > negative:
-                emotions.remove('negative')
-            elif negative > positive:
-                emotions.remove('positive')
-        except ValueError:
-            ...
+        max_score = max(emotions_sorted, key=lambda x: x[1])[1] if emotions_sorted else 1
+        emotions = [{'label': emo[0],
+                     'score': (emo[1]/max_score)*(2**-i)} for i, emo in enumerate(emotions_sorted)]
         return emotions
 
     def get_gesture(self, gesture: Union[Emotions, str], intensity: float):
