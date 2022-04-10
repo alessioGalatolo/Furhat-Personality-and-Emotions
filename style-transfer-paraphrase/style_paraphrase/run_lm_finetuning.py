@@ -497,8 +497,7 @@ def main():
             else:
                 logger.info("Sleeping for {:d} minutes...zzzz...".format(args.eval_frequency_min))
                 time.sleep(args.eval_frequency_min * 60)
-
-    return all_results
+        return all_results
 
 
 if __name__ == "__main__":
