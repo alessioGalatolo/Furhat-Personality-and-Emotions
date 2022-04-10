@@ -72,11 +72,11 @@ class EmotionGenerator():
                     rgb = name_to_rgb(EmotionGenerator.NRC2LED[emotion])
                     furhat.set_led(red=rgb[0], green=rgb[1], blue=rgb[2])
                     break
-        for emotion in emotions:
+        for i, emotion in enumerate(emotions):
             print(f'Recognized emotion {emotion}')
             if emotion not in EmotionGenerator.NRC2GESTURE:
                 continue  # TODO
-            gesture = self.get_gesture(EmotionGenerator.NRC2GESTURE[emotion], intensity=1)
+            gesture = self.get_gesture(EmotionGenerator.NRC2GESTURE[emotion], intensity=2**-(i+1))
             furhat.gesture(**gesture)
         furhat.say(text=text, async_req=False, blocking=True)
         furhat.gesture(**self.get_gesture(EmotionGenerator.Emotions.NEUTRAL, intensity=1))
@@ -112,7 +112,7 @@ class EmotionGenerator():
             print(f'Gesture {gesture} not found in list of custom gestures')
             return {'name': gesture}
 
-    def _neutral(self, intensity):
+    def _neutral(self, _):
         return {"frames": [
                     {
                         "time": [0.1],
