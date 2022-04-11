@@ -52,7 +52,7 @@ class PersonalityTransfer():
         st_input_data = self.paraphrase(texts)
 
         transferred_data = []
-        for i in tqdm.tqdm(range(0, len(st_input_data), self.batch_size),
+        for i in tqdm(range(0, len(st_input_data), self.batch_size),
                            desc="transferring dataset..."):
             if self.output_class is not None:
                 transferred_data.extend(
