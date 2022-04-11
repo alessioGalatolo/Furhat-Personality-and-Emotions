@@ -27,7 +27,7 @@ class EmotionGenerator():
     NRC2LED = {'disgust': 'green', 'fear': 'purple',
                'joy': 'yellow', 'anger': 'red', 'sadness': 'blue'}
 
-    def __init__(self, emotion_recognizer='HuggingFace', nrc_path='./data/nrc_lexicon'):
+    def __init__(self, emotion_recognizer='roberta', nrc_path='./data/nrc_lexicon'):
         if emotion_recognizer == "nrc":
             nrc_lexicon = pd.read_excel(os.path.join(nrc_path, 'NRC-Emotion-Lexicon.xlsx'))
             self.word2emotion = defaultdict(lambda: [])
@@ -41,7 +41,7 @@ class EmotionGenerator():
                 self.word2emotion[row[1]['Word']] = emotions
             del nrc_lexicon
             self.text2emotion = self._nrc_text2emotion
-        elif emotion_recognizer == "HuggingFace":
+        elif emotion_recognizer == "roberta":
             from transformers import pipeline
             self.emotion_classifier = pipeline("text-classification",
                                                model="j-hartmann/emotion-english-roberta-large",
@@ -123,7 +123,7 @@ class EmotionGenerator():
     def _neutral(self, _):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "BROW_INNER_DOWN": 0,
                             "SMILE_OPEN": 0,
@@ -142,7 +142,7 @@ class EmotionGenerator():
     def _anger(self, intensity=1):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "EXPR_ANGER": intensity
                         }
@@ -153,7 +153,7 @@ class EmotionGenerator():
     def _fear(self, intensity=1):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "EXPR_FEAR": intensity
                         }
@@ -164,7 +164,7 @@ class EmotionGenerator():
     def _disgust(self, intensity=1):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "EXPR_DISGUST": intensity
                         }
@@ -175,7 +175,7 @@ class EmotionGenerator():
     def _sadness(self, intensity=1):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "EXPR_SAD": intensity
                         }
@@ -204,7 +204,7 @@ class EmotionGenerator():
     def _surprise(self, intensity=1):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "SURPRISE": intensity
                         }
@@ -215,7 +215,7 @@ class EmotionGenerator():
     def _happiness(self, intensity=1):
         return {"frames": [
                     {
-                        "time": [0.1],
+                        "time": [1],
                         "params": {
                             "SMILE_OPEN": intensity,
                             "JAW_OPEN": intensity*0.2,
