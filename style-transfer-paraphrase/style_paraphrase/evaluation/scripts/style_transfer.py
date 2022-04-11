@@ -72,6 +72,7 @@ class PersonalityTransfer():
             transferred_data = [x.lower() for x in transferred_data]
 
         transferred_data = [" ".join(x.split()) for x in transferred_data]
+        return transferred_data
 
     @staticmethod
     def detokenize(x):
