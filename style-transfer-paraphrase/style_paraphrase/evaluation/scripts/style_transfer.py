@@ -1,9 +1,3 @@
-import argparse
-import os
-import random
-import sys
-from sympy import det, re
-import torch
 from tqdm import tqdm
 
 from style_paraphrase.inference_utils import GPT2Generator
@@ -53,7 +47,7 @@ class PersonalityTransfer():
 
         transferred_data = []
         for i in tqdm(range(0, len(st_input_data), self.batch_size),
-                           desc="transferring dataset..."):
+                      desc="transferring dataset..."):
             if self.output_class is not None:
                 transferred_data.extend(
                     self.style_transfer_model.generate_batch(

@@ -1,7 +1,8 @@
 # Emotions on Furhat for now
-
+This repo stores all the material used for my master's thesis
 ## Requirements
-Python > 3.10 and python 3.7 (for pytorch)
+Python 3.7
+
 
 # Datasets
 | Name | Size | Labels | Origin | Method | Reference |
