@@ -23,8 +23,19 @@ data = pd.read_csv('./twitter/training.1600000.processed.noemoticon.csv',
 
 personality_classifier = PersonalityTransfer('utils.config')
 data['text'] = data['text'].apply(preprocess_text)
-data['label'] = data['text'].apply(lambda x: 'ext' if personality_classifier.classify(x) == 1 else 'int')
-text_labels = []
+
+
+def classify(x):
+    try:
+        label = personality_classifier.classify(x)
+        label = 'ext' if label == 1 else 'int'
+    except ValueError:
+        label = 'invalid'
+    return label
+
+
+data['label'] = data['text'].apply(classify)
+data = data[data['label'] != 'invalid']
 
 train = data.sample(frac=0.8)
 val_test = data.drop(train.index)
