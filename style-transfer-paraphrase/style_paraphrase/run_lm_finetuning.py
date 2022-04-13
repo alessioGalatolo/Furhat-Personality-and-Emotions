@@ -494,9 +494,6 @@ def main():
 
             if args.eval_frequency_min == 0 or args.evaluate_specific or patience > args.eval_patience:
                 eval_done = True
-            else:
-                logger.info("Sleeping for {:d} minutes...zzzz...".format(args.eval_frequency_min))
-                time.sleep(args.eval_frequency_min * 60)
         return all_results
 
 
