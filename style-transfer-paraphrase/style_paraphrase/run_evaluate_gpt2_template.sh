@@ -15,7 +15,7 @@ export DATA_DIR={dataset}
 
 BASE_DIR=style_paraphrase
 
-python -m torch.distributed.launch --nproc_per_node=1 $BASE_DIR/run_lm_finetuning.py \
+python $BASE_DIR/run_lm_finetuning.py \
     --output_dir=$BASE_DIR/saved_models/model_{job_id} \
     --model_type=gpt2 \
     --model_name_or_path={model_name} \
