@@ -8,7 +8,8 @@ from utils.prepare_data import parse_sentence
 
 
 class PersonalityTransfer:
-    def __init__(self, config_module, device='cpu', checkpoint_name='final_model.pth'):
+    def __init__(self, config_module, datasets_default_path="utils/data/",
+                 device='cpu', checkpoint_name='final_model.pth'):
         device = torch.device(device)
         config = import_module(config_module)
         config = tx.HParams(config.model, None)
@@ -21,7 +22,7 @@ class PersonalityTransfer:
             exit(-1)
         self.input_len = checkpoint['input_len']
 
-        self.vocab = TextDataset.load_vocab(f"utils/data/{checkpoint['dataset']}/vocab")
+        self.vocab = TextDataset.load_vocab(f"{datasets_default_path}/{checkpoint['dataset']}/vocab")
         self.model = CtrlGenModel(self.input_len,
                                   self.vocab, config, device)
         self.model.load_state_dict(checkpoint['model_state_dict'], strict=True)

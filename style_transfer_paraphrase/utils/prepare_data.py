@@ -90,7 +90,7 @@ def prepare_mbti(base_path, max_length, text_file, label_file, vocab_file, inter
                 for sentence in parse_sentence(post, max_length):
                     text.write(sentence + "\n")
                     data = data.append(row_data, ignore_index=True)
-    data['EXT'].astype(int).to_csv(f'{label_file}_{"EXT"}',
+    data['EXT'].astype(int).to_csv(f'{label_file}_EXT',
                                    index=False, header=False)
     with open(vocab_file, "w+") as vocab:
         vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
@@ -117,7 +117,7 @@ def prepare_personage_data(base_path, max_length, text_file, label_file, vocab_f
     texts2, labels2 = _prepare_personage_data(f"{base_path}/randomParams.tab", max_length, interactive)
     texts.extend(texts2)
     labels.extend(labels2)
-    with open(label_file, 'w+') as label:
+    with open(f'{label_file}_EXT', 'w+') as label:
         label.writelines(labels)
     with open(text_file, 'w+') as text:
         text.writelines(texts)
@@ -178,7 +178,6 @@ def main():
 
     parser = argparse.ArgumentParser(description='Dataset downloader and preprocessor')
     parser.add_argument('--dataset',
-                        default='yelp',
                         choices=list(DATASET2FUN.keys()),
                         help='name of the dataset to download or preprocess')
     parser.add_argument('--base-path',
