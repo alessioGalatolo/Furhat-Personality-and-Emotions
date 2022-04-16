@@ -15,7 +15,7 @@
 """
 import argparse
 from collections import defaultdict
-from os import makedirs, mkdir, path, rename, listdir
+from os import makedirs, mkdir, path,  listdir
 from re import findall, sub
 import string
 import pandas as pd
@@ -96,12 +96,68 @@ def prepare_mbti(base_path, max_length, text_file, label_file, vocab_file, inter
         vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
-def prepare_personage_data():
-    ...
+def _prepare_personage_data(path, max_length, interactive):
+    with open(path, 'r') as personage:
+        data = pd.read_csv(personage, delimiter='\t')
+    texts = []
+    labels = []
+    data_iterator = data.iterrows()
+    if interactive:
+        data_iterator = tqdm(data_iterator, total=data.shape[0])
+    for row in data_iterator:
+        row_data = "1\n" if row[1]['avg.extra'] > 4 else "0\n"
+        for sentence in parse_sentence(row[1]['realization'], max_length):
+            texts.append(sentence+'\n')
+            labels.append(row_data)
+    return texts, labels
 
 
-def prepare_personality_detection():
-    ...
+def prepare_personage_data(base_path, max_length, text_file, label_file, vocab_file, interactive):
+    texts, labels = _prepare_personage_data(f"{base_path}/predefinedParams.tab", max_length, interactive)
+    texts2, labels2 = _prepare_personage_data(f"{base_path}/randomParams.tab", max_length, interactive)
+    texts.extend(texts2)
+    labels.extend(labels2)
+    with open(label_file, 'w+') as label:
+        label.writelines(labels)
+    with open(text_file, 'w+') as text:
+        text.writelines(texts)
+    with open(vocab_file, "w+") as vocab:
+        vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
+
+
+def prepare_personality_detection(base_path, max_length, text_file, label_file, vocab_file, interactive):
+    with open(f"{base_path}/personality-detection", "r") as data_file:
+        data = pd.read_csv(data_file)
+    unexpanded_data = data
+
+    data = pd.DataFrame()
+    with open(text_file, "w+") as text:
+        data_iterator = unexpanded_data.iterrows()
+        if interactive:
+            data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
+        for row in data_iterator:
+            row_data = {'EXT': row[1]['cEXT']}
+            character = row[1]['character']
+            next_is_text = False
+            texts = []
+            for row_part in row[1]['text'].split('b>'):
+                if next_is_text:
+                    # remove initial : and ending <br><br>
+                    row_part = row_part[2:-9]
+                    # remove text in parenthesis indicating what's happening in the scene
+                    row_part = sub(r'\(.+\)', '', row_part)
+                    texts.append(row_part)
+                    next_is_text = False
+                elif str(row_part).startswith(character):
+                    next_is_text = True
+            for post in texts:
+                for sentence in parse_sentence(post, max_length):
+                    text.write(sentence + "\n")
+                    data = data.append(row_data, ignore_index=True)
+    data['EXT'].astype(int).to_csv(f'{label_file}_{"EXT"}',
+                                   index=False, header=False)
+    with open(vocab_file, "w+") as vocab:
+        vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
 def main():
@@ -118,7 +174,7 @@ def main():
                     'personage-data': "http://farm2.user.srcf.net/research/personage/personage-data.tar.gz",
                     'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv"}
     DOWNLOAD_IS_COMPRESSED = defaultdict(lambda: False,
-                                         [('personage-data', True), ('twitter_covid', True)])
+                                         [('personage-data', True)])
 
     parser = argparse.ArgumentParser(description='Dataset downloader and preprocessor')
     parser.add_argument('--dataset',
