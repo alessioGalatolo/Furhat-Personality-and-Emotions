@@ -127,7 +127,7 @@ def main():
                         help='name of the dataset to download or preprocess')
     parser.add_argument('--base-path',
                         help='base path for the dataset dir',
-                        default='./personality_transfer_model/data')
+                        default='./style_transfer_paraphrase/utils/data')
     parser.add_argument('--max-length',
                         help='Max length (number of words) for a row in the dataset',
                         default=20)

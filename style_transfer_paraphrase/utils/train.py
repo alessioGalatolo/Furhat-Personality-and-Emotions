@@ -43,7 +43,7 @@ def main():
                         required=True)
     parser.add_argument('--base-path',
                         help='base path for the dataset dir',
-                        default='./personality_transfer_model/data')
+                        default='./style_transfer_paraphrase/utils/data')
     parser.add_argument('--trait',
                         help='The traits to use as classification',
                         choices=['OPN', 'CON', 'EXT', 'AGR', 'NEU'],
