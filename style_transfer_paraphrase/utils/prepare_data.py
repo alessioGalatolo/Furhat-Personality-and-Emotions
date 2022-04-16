@@ -212,7 +212,7 @@ def main():
     else:
         mkdir(store_processed_path)
     DATASET2FUN[args.dataset](store_path,
-                              args.max_length,
+                              int(args.max_length),
                               f"{store_processed_path}/text",
                               f"{store_processed_path}/labels",
                               f"{store_processed_path}/vocab",
