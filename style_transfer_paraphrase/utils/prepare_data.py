@@ -29,12 +29,6 @@ translation_table[ord(',')] = ' , '
 translation_table[ord('!')] = ' ! '
 
 
-def prepare_yelp(**kwargs):
-    """Downloads data.
-    """
-    rename(r"./yelp/sentiment.*", r"./yelp/*")
-
-
 def prepare_ear():
     ...
 
@@ -110,10 +104,6 @@ def prepare_personality_detection():
     ...
 
 
-def prepare_twitter_covid():
-    ...
-
-
 def main():
     """Entrypoint.
     """
@@ -121,14 +111,12 @@ def main():
                    'essays': prepare_essays,
                    'mbti': prepare_mbti,
                    'personage-data': prepare_personage_data,
-                   'personality-detection': prepare_personality_detection,
-                   'twitter_covid': prepare_twitter_covid}
+                   'personality-detection': prepare_personality_detection}
     DATASET2LINK = {'ear': ...,  # TODO
                     'essays': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/essays/essays.csv?raw=true",
                     'mbti': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/kaggle/kaggle.csv?raw=true",
                     'personage-data': "http://farm2.user.srcf.net/research/personage/personage-data.tar.gz",
-                    'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv",
-                    'twitter_covid': 'https://zenodo.org/record/5090588/files/full_dataset_clean.tsv.gz?download=1'}
+                    'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv"}
     DOWNLOAD_IS_COMPRESSED = defaultdict(lambda: False,
                                          [('personage-data', True), ('twitter_covid', True)])
 

@@ -13,4 +13,5 @@ wandb
 *.text
 *.label
 *.tsv
-utils/data
+style_transfer_paraphrase/utils/data
+paraphraser_gpt2_large
