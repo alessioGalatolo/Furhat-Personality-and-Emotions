@@ -1,6 +1,6 @@
 from furhat_remote_api import FurhatRemoteAPI
 from emotions import EmotionGenerator
-from personality_transfer_model.model_wrapper import PersonalityTransferModel
+from style_transfer_paraphrase.utils.model_wrapper import PersonalityTransferModel
 
 
 def main():

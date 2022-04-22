@@ -4,8 +4,15 @@
 
 __pycache__
 
-data/
+/data
 
 checkpoints/
 
 wandb
+
+*.txt
+*.text
+*.label
+*.tsv
+style_transfer_paraphrase/utils/data
+paraphraser_gpt2_large
