@@ -16,10 +16,17 @@
 import argparse
 from collections import defaultdict
 from os import makedirs, mkdir, path, rename, listdir
-from re import findall
+from re import findall, sub
+import string
 import pandas as pd
 from tqdm import tqdm
 import texar.torch as tx
+
+translation_table = defaultdict(lambda: ' ', {ord(letter): letter for letter in string.ascii_letters})
+translation_table[ord('.')] = ' . '
+translation_table[ord('?')] = ' ? '
+translation_table[ord(',')] = ' , '
+translation_table[ord('!')] = ' ! '
 
 
 def prepare_yelp(**kwargs):
@@ -32,27 +39,36 @@ def prepare_ear():
     ...
 
 
-def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, interactive, expand_essays=True):
+def parse_sentence(text, max_length):
+    # remove links
+    text = sub(r'https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)',
+               '', text)
+    # split sentences
+    for sentence in findall(r'(".+")|([^.?!]+[.?!])', text):
+        for match in sentence:
+            if match:
+                translated = sub(r' +', ' ', match.translate(translation_table).strip())
+                if len(translated) > 2 and len(translated.split()) < max_length:
+                    yield translated
+
+
+def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, interactive):
     traits_labels = ['cOPN', 'cCON', 'cEXT', 'cAGR', 'cNEU']
     with open(f"{base_path}/essays", "r") as essays:
         data = pd.read_csv(essays)
-    if expand_essays:
-        print('Expanding the essays into single sentences, this will probably take a long time...')
-        unexpanded_data = data
-        data = pd.DataFrame()
-        with open(text_file, "w+") as text:
-            data_iterator = unexpanded_data.iterrows()
-            if interactive:
-                data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
-            for row in data_iterator:
-                row_data = {trait: row[1][trait] for trait in traits_labels}
-                for sentence in findall(r'(".+")|([^.?!]+[.?!])', row[1]['text']):
-                    for match in sentence:
-                        if match and len(match.split()) < max_length:
-                            text.write(match.replace(".", " .").replace("!", " !").replace("?", " ?").strip() + "\n")
-                    data = data.append(row_data, ignore_index=True)
-    else:
-        data['text'].to_csv(text_file, index=False, header=False)
+    print('Expanding the essays into single sentences, this will probably take a long time...')
+    unexpanded_data = data
+
+    data = pd.DataFrame()
+    with open(text_file, "w+") as text:
+        data_iterator = unexpanded_data.iterrows()
+        if interactive:
+            data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
+        for row in data_iterator:
+            row_data = {trait: row[1][trait] for trait in traits_labels}
+            for sentence in parse_sentence(row[1]['text'], max_length):
+                text.write(sentence + "\n")
+                data = data.append(row_data, ignore_index=True)
     numerical_traits = data[traits_labels].applymap(lambda x: 1 if x == 'y' else 0)
     for trait in traits_labels:
         numerical_traits[trait].to_csv(f'{label_file}_{trait[1:4]}',
@@ -61,8 +77,28 @@ def prepare_essays(base_path, max_length, text_file, label_file, vocab_file, int
         vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
-def prepare_mbti():
-    ...
+def prepare_mbti(base_path, max_length, text_file, label_file, vocab_file, interactive):
+    type2trait = {'I': {'EXT': 0}, 'E': {'EXT': 1}}
+    with open(f"{base_path}/mbti", "r") as mbti:
+        data = pd.read_csv(mbti)
+    print('Expanding mbti into single sentences, this will probably take a long time...')
+    unexpanded_data = data
+
+    data = pd.DataFrame()
+    with open(text_file, "w+") as text:
+        data_iterator = unexpanded_data.iterrows()
+        if interactive:
+            data_iterator = tqdm(data_iterator, total=unexpanded_data.shape[0])
+        for row in data_iterator:
+            row_data = type2trait[row[1]['type'][0]]
+            for post in row[1]['text'].split('|||'):
+                for sentence in parse_sentence(post, max_length):
+                    text.write(sentence + "\n")
+                    data = data.append(row_data, ignore_index=True)
+    data['EXT'].astype(int).to_csv(f'{label_file}_{"EXT"}',
+                                   index=False, header=False)
+    with open(vocab_file, "w+") as vocab:
+        vocab.writelines(map(lambda x: x + '\n', tx.data.make_vocab(text_file)))
 
 
 def prepare_personage_data():
@@ -87,7 +123,7 @@ def main():
                     'mbti': "https://github.com/yashsmehta/personality-prediction/blob/65b9d821b2c3f71e73fef77d4e9ef2117f990a8f/data/kaggle/kaggle.csv?raw=true",
                     'personage-data': "http://farm2.user.srcf.net/research/personage/personage-data.tar.gz",
                     'personality-detection': "https://raw.githubusercontent.com/emorynlp/personality-detection/3ec08a58dc7c708c5dfc314b3bff8f5808786928/CSV/friends-personality.csv",
-                    'yelp': "https://drive.google.com/file/d/'1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing"}
+                    'yelp': "https://drive.google.com/file/d/1HaUKEYDBEk6GlJGmXwqYteB-4rS9q8Lg/view?usp=sharing"}
     DOWNLOAD_IS_COMPRESSED = defaultdict(lambda: False,
                                          [('yelp', True), ('personage-data', True)])
 
