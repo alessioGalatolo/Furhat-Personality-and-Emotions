@@ -1,6 +1,0 @@
-twarc
-tweepy
-xtract
-wget
-emot
-emoji

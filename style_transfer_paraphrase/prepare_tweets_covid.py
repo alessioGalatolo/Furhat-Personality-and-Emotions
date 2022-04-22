@@ -105,7 +105,7 @@ if '.tsv' in inputfile:
 elif '.csv' in inputfile:
     inputfile_data = pd.read_csv(inputfile)
 elif '.txt' in inputfile:
-    inputfile_data = pd.read_csv(inputfile, sep='\n', header=None, names=['tweet_id'] )
+    inputfile_data = pd.read_csv(inputfile, sep='\n', header=None, names=['tweet_id'])
     print(inputfile_data)
 
 inputfile_data = inputfile_data.set_index('tweet_id')
