@@ -11,7 +11,7 @@ checkpoints/
 wandb
 
 *.txt
-!requirements.txt
+!*requirements.txt
 *.text
 *.label
 *.tsv
