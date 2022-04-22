@@ -21,8 +21,8 @@ import torch
 import math
 import texar.torch as tx
 from tqdm import tqdm
-from ctrl_gen_model import CtrlGenModel
-from dataset import MultiTextDataLoader, TextDataset
+from utils.ctrl_gen_model import CtrlGenModel
+from utils.dataset import MultiTextDataLoader, TextDataset
 try:
     import wandb
 except ImportError:

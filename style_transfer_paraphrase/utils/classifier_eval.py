@@ -28,9 +28,15 @@ def main():
     parser.add_argument('--base-path',
                         default='style_transfer_paraphrase/utils/data',
                         help='The base path where to find the datasets.')
+    parser.add_argument('--checkpoint',
+                        default='final_model.pth',
+                        help='The name of the checkpoint to use')
     args = parser.parse_args()
-    personality_classifier = PersonalityTransfer('utils.config', datasets_default_path=args.base_path)
-    datasets = ['personage-data', 'personality-detection', 'essays_long', 'essays']
+    personality_classifier = PersonalityTransfer('utils.config',
+                                                 datasets_default_path=args.base_path,
+                                                 checkpoint_name=args.checkpoint)
+    datasets = ['personage-data', 'personality-detection', 'essays_test', 'essays', 'essays_unexpanded', 'mbti', 'mbti_unexpanded']
+    print(f'Evaluating the model: {args.checkpoint}')
     for dataset in datasets:
         with open(os.path.join(args.base_path, dataset, 'text'), 'r') as texts,\
              open(os.path.join(args.base_path, dataset, 'labels_EXT'), 'r') as labels:
