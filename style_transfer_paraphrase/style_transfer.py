@@ -1,5 +1,4 @@
 from tqdm import tqdm
-
 from style_paraphrase.inference_utils import GPT2Generator
 
 
@@ -8,7 +7,7 @@ class PersonalityTransfer():
                  generation_mode='nucleus_paraphrase', batch_size=32,
                  top_p=0.9, output_class=None, detokenize=True,
                  post_detokenize=True, lowercase=False, post_lowercase=False):
-        if generation_mode == 'greedy' or 'nucleus' in generation_mode:
+        if 'greedy' in generation_mode or 'nucleus' not in generation_mode:
             top_p = 0.0
         self.detokenize = detokenize
         self.post_detokenize = post_detokenize
@@ -24,9 +23,13 @@ class PersonalityTransfer():
         else:
             self.paraphrase = lambda x: x
         vec_data_dir = None  # FIXME os.path.dirname(os.path.dirname(args.input_file))
-        self.style_transfer_model = GPT2Generator(
-            style_transfer_model_path, upper_length="same_10", top_p=top_p, data_dir=vec_data_dir
-        )
+        if generation_mode == "paraphrase":  # only paraphrase
+            self.style_transfer_model = lambda x: x
+        else:
+            self.style_transfer_model = GPT2Generator(style_transfer_model_path,
+                                                      upper_length="same_10",
+                                                      top_p=top_p,
+                                                      data_dir=vec_data_dir)
 
     def paraprhase_wmodel(self, input_data):
         st_input_data = []
