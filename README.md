@@ -3,20 +3,22 @@ This repo stores all the material of my master's thesis. Here I try to combine p
 ## Repository structure
 ```bash
 .
-├── style_trasnfer_paraphrase   # Contains the paraphrase model for personality style transfer
-|   ├── utils                   # Utilities + GAN-based model that has both personality classifier and generator
-|   │   ├── prepare_data.py     # Download and pre-process data (compatible with all models)
-|   │   ├── train.py            # Train the GAN-based model
-|   │   ├── classifier_eval.py  # Evaluate the classifier
-|   │   ├── train.py            # Train the GAN-based model
-|   │   ├── model_wrapper.py    # Model wrapper for easier use in inference mode
-|   │   └── ...
-|   ├── prepare_tweets_covid.py # Download and expand (dataset comes with only IDs) the twitter covid dataset
-|   ├── prepare_tweets.py       # Download and preprocess the large twitter dataset
-|   ├── style_transfer.py       # A wrapper to use the paraphrase model
-|   └── ...
-├── emotions.py                 # A wrapper used to recognize emotions from text and express them on furhat
-├── main.py                     # Connects to Furhat and executes the experiment
+├── style_trasnfer_paraphrase         # Contains the paraphrase model for personality style transfer
+│   ├── utils                         # Utilities + GAN-based model that has both personality classifier and generator
+│   │   ├── prepare_data.py           # Download and pre-process data (compatible with all models)
+│   │   ├── train.py                  # Train the GAN-based model
+│   │   ├── classifier_eval.py        # Evaluate the classifier
+│   │   ├── train.py                  # Train the GAN-based model
+│   │   ├── model_wrapper.py          # Model wrapper for easier use in inference mode
+│   │   └── ...
+│   ├── prepare_tweets_covid.py       # Download and expand (dataset comes with only IDs) the twitter covid dataset
+│   ├── prepare_tweets.py             # Download and preprocess the large twitter dataset
+│   ├── style_transfer.py             # A wrapper to use the paraphrase model
+│   ├── eval_personality_transfer.py  # A script to generate the transferred sentences
+│   └── ...
+├── pilot_data                        # Includes all the data used and collected from the first pilot study
+├── emotions.py                       # A wrapper used to recognize emotions from text and express them on furhat
+├── main.py                           # Connects to Furhat and executes the experiment
 └── ...
 ```
 ## Requirements
