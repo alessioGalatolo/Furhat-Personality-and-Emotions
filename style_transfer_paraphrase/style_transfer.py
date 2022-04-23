@@ -42,7 +42,7 @@ class PersonalityTransfer():
             texts = [text.lower() for text in texts]
 
         if "paraphrase" in self.mode:
-            texts = self.paraphrase_model(texts)
+            texts = self.paraprhase_wmodel(texts)
 
         transferred_data = []
         if self.mode == "paraphrase":  # only paraphrase
