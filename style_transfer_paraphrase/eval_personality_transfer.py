@@ -22,7 +22,8 @@ def main():
             pt1.change_mode(mode, top_p)
             data[f'model_0_{mode}_{top_p}'] = pt0.transfer_style("\n".join(data['original']))
             data[f'model_1_{mode}_{top_p}'] = pt1.transfer_style("\n".join(data['original']))
-    data.to_csv(output_file)
+    for i, row in enumerate(data.iterrows()):
+        row.T.to_csv(f'{output_file}_{i}.csv')
 
 
 if __name__ == "__main__":

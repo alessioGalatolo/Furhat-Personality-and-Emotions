@@ -25,6 +25,7 @@ class PersonalityTransfer():
     def change_mode(self, new_mode, top_p=0.9):
         self.mode = new_mode
         self.top_p = 0 if 'greedy' in new_mode or 'nucleus' not in new_mode else top_p
+        self.style_transfer_model.modify_p(self.top_p)
 
     def paraprhase_wmodel(self, input_data):
         st_input_data = []
