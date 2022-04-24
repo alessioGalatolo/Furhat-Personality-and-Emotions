@@ -6,7 +6,6 @@ class PersonalityTransfer():
                  generation_mode='nucleus_paraphrase', batch_size=32,
                  top_p=0.9, output_class=None, detokenize=True,
                  post_detokenize=True, lowercase=False, post_lowercase=False):
-        self.change_mode(generation_mode, top_p)
         self.detokenize = detokenize
         self.post_detokenize = post_detokenize
         self.post_lowercase = post_lowercase
@@ -19,8 +18,9 @@ class PersonalityTransfer():
         vec_data_dir = None  # FIXME os.path.dirname(os.path.dirname(args.input_file))
         self.style_transfer_model = GPT2Generator(style_transfer_model_path,
                                                   upper_length="same_10",
-                                                  top_p=self.top_p,
+                                                  top_p=top_p,
                                                   data_dir=vec_data_dir)
+        self.change_mode(generation_mode, top_p)
 
     def change_mode(self, new_mode, top_p=0.9):
         self.mode = new_mode
