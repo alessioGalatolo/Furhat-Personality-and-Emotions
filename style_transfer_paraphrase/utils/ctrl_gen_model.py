@@ -138,7 +138,7 @@ class CtrlGenModel(nn.Module):
             with torch.no_grad():
                 # Accuracy on soft samples, for training progress monitoring
                 accu_g = tx.evals.accuracy(labels=1 - inputs['labels'],
-                                            preds=soft_preds)
+                                           preds=soft_preds)
 
                 # Accuracy on greedy-decoded samples, for training progress monitoring
                 _, gdy_preds = self.classifier(

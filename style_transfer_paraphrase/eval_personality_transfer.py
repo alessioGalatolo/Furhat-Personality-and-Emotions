@@ -6,7 +6,7 @@ def main():
     input_file = '../pilot_data/inputs'
     output_file = '../pilot_data/outputs'
     data = pd.read_csv(input_file, sep='<', names=['original'])
-    modes = ['nucleus_paraphrase', 'nucleus', 'greedy_paraphrase', 'greedy', 'paraphrase']
+    modes = ['nucleus_paraphrase', 'nucleus']
     top_ps = [i/20 for i in range(20)]
     pt0 = PersonalityTransfer("style_paraphrase/saved_models/model_0",
                               "paraphraser_gpt2_large",
@@ -22,6 +22,8 @@ def main():
             pt1.change_mode(mode, top_p)
             data[f'model_0_{mode}_{top_p}'] = pt0.transfer_style("\n".join(data['original']))
             data[f'model_1_{mode}_{top_p}'] = pt1.transfer_style("\n".join(data['original']))
+    pt0.change_mode('paraphrase', top_p)
+    data['paraphrase'] = pt0.transfer_style("\n".join(data['original']))
     for i, row in enumerate(data.iterrows()):
         row[1].T.to_csv(f'{output_file}_{i}.csv')
 
