@@ -1,3 +1,4 @@
+from re import findall
 import pandas as pd
 from style_transfer import PersonalityTransfer
 
@@ -5,9 +6,11 @@ from style_transfer import PersonalityTransfer
 def main():
     input_file = '../pilot_data/inputs'
     output_file = '../pilot_data/outputs'
-    data = pd.read_csv(input_file, sep='<', names=['original'])
+    with open(input_file, 'r') as input:
+        inputs = input.readlines()
+    data = pd.DataFrame({'original': inputs})
     modes = ['nucleus_paraphrase', 'nucleus']
-    top_ps = [i/20 for i in range(20)]
+    top_ps = [0.5+i/10 for i in range(5)]
     pt0 = PersonalityTransfer("style_paraphrase/saved_models/model_0",
                               "paraphraser_gpt2_large",
                               modes[0],
@@ -20,8 +23,13 @@ def main():
         for top_p in top_ps:
             pt0.change_mode(mode, top_p)
             pt1.change_mode(mode, top_p)
-            data[f'model_0_{mode}_{top_p}'] = pt0.transfer_style("\n".join(data['original']))
-            data[f'model_1_{mode}_{top_p}'] = pt1.transfer_style("\n".join(data['original']))
+            results_0 = []
+            results_1 = []
+            for row in data['original'].iterrows():
+                results_0.append(''.join((pt0.transfer_style("\n".join(findall(r'([^.?!]+[.?!])', row[1]))))))
+                results_1.append(''.join((pt1.transfer_style("\n".join(findall(r'([^.?!]+[.?!])', row[1]))))))
+            data[f'model_0_{mode}_{top_p}'] = results_0
+            data[f'model_1_{mode}_{top_p}'] = results_1
     pt0.change_mode('paraphrase', top_p)
     data['paraphrase'] = pt0.transfer_style("\n".join(data['original']))
     data.to_csv(f'{output_file}.csv')
