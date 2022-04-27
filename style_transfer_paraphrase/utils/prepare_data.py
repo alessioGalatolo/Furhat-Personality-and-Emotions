@@ -131,7 +131,7 @@ def prepare_personality_detection(base_path, max_length, text_file, label_file, 
                 for sentence in parse_sentence(post, max_length):
                     text.write(sentence + "\n")
                     data = data.append(row_data, ignore_index=True)
-    data['EXT'].astype(int).to_csv(f'{label_file}_{"EXT"}',
+    data['EXT'].astype(int).to_csv(f'{label_file}_EXT',
                                    index=False, header=False)
 
 
@@ -202,7 +202,7 @@ def main():
         print("Doing trianing testing split")
         # FIXME: this is slow and can probably be improved
         data = pd.read_csv(text_file, sep='<', names=['text'], header=None)
-        data['label'] = pd.read_csv(label_file, sep='<', header=None)
+        data['label'] = pd.read_csv(f'{label_file}_EXT', sep='<', header=None)
         train = data.sample(frac=0.8)
         val_test = data.drop(train.index)
         val = val_test.sample(frac=0.5)
