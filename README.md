@@ -3,6 +3,13 @@ This repo stores all the material of my master's thesis. Here I try to combine p
 ## Repository structure
 ```bash
 .
+├── pilot_data                        # Includes all the data used, collected and analysis from the pilot study
+│   ├── inputs                        # Original dialogues used before the personality shaping
+│   ├── outputs_handcrafted           # The dialogues personalised according to literature
+│   ├── outputs_gpt3                  # The dialogues personalised by GPT-3 with one-shot learning
+│   ├── outputs_strap                 # The dialogues personalised by STRAP
+│   ├── data.csv                      # Data collected from the pilot study
+│   └── basic_analysis.ipynb          # Some basic analysis of the data collected
 ├── style_trasnfer_paraphrase         # Contains the paraphrase model for personality style transfer
 │   ├── utils                         # Utilities + GAN-based model that has both personality classifier and generator
 │   │   ├── prepare_data.py           # Download and pre-process data (compatible with all models)
@@ -16,7 +23,6 @@ This repo stores all the material of my master's thesis. Here I try to combine p
 │   ├── style_transfer.py             # A wrapper to use the paraphrase model
 │   ├── eval_personality_transfer.py  # A script to generate the transferred sentences
 │   └── ...
-├── pilot_data                        # Includes all the data used and collected from the first pilot study
 ├── emotions.py                       # A wrapper used to recognize emotions from text and express them on furhat
 ├── main.py                           # Connects to Furhat and executes the experiment
 └── ...
