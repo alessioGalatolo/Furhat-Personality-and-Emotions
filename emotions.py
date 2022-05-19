@@ -50,7 +50,7 @@ class EmotionGenerator():
         else:
             raise NotImplementedError
 
-    def animate_dialogue(self, furhat, text, length_threshold=10, use_led=True):
+    def animate_dialogue(self, furhat, text, length_threshold=10, use_led=False):
         """
         Makes furhat speak what's in text while also performing
         emotional gestures
@@ -71,7 +71,8 @@ class EmotionGenerator():
                 continue
             self._animate_text(furhat, current_text, use_led)
             current_text = ''
-        self._animate_text(furhat, current_text, use_led)
+        if current_text:
+            self._animate_text(furhat, current_text, use_led)
 
     def _animate_text(self, furhat, text, use_led):
         if use_led:
@@ -87,7 +88,7 @@ class EmotionGenerator():
             if emotion['label'] not in EmotionGenerator.NRC2GESTURE:
                 continue  # TODO
             gesture = self.get_gesture(EmotionGenerator.NRC2GESTURE[emotion['label']],
-                                       intensity=emotion['score'])
+                                       intensity=emotion['score']*0.5)
             furhat.gesture(**gesture)
         furhat.say(text=text, async_req=False, blocking=True)
         furhat.gesture(**self.get_gesture(EmotionGenerator.Emotions.NEUTRAL, intensity=1))
