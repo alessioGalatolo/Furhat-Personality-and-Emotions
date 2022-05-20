@@ -102,6 +102,7 @@ class EmotionGenerator():
     def _nrc_text2emotion(self, text):
         emotions_detected = {}
         for word in text.split():
+            word = ''.join(filter(str.isalpha, word))
             for emotion in self.word2emotion[word.lower()]:
                 if emotion not in emotions_detected:
                     emotions_detected[emotion] = 0
@@ -228,7 +229,7 @@ class EmotionGenerator():
 
 
 if __name__ == '__main__':
-    emotion_generator = EmotionGenerator()
+    emotion_generator = EmotionGenerator("nrc")
     texts = ['My mom is the devil',
              'I have a very bad case of toothache',
              'The restaurant I visited is very good',
