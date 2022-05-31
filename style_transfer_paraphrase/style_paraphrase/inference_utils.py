@@ -12,10 +12,10 @@ from style_paraphrase.utils import init_gpt2_model
 
 
 class GPT2Generator(object):
-    def __init__(self, model_path, upper_length="same_10", beam_size=1, top_p=0.0, data_dir=None):
+    def __init__(self, model_path, upper_length="same_10", beam_size=1, top_p=0.0, data_dir=None, device='gpu'):
         self.model_path = model_path
         self.args = torch.load("{}/training_args.bin".format(self.model_path))
-        self.modify_args(upper_length, beam_size, top_p)
+        self.modify_args(upper_length, beam_size, top_p, device=device)
         self.config = BASE_CONFIG
         update_config(self.args, self.config)
 
@@ -41,7 +41,7 @@ class GPT2Generator(object):
                                                           model_class=GPT2LMHeadModel,
                                                           tokenizer_class=GPT2Tokenizer)
 
-    def modify_args(self, upper_length, beam_size, top_p):
+    def modify_args(self, upper_length, beam_size, top_p, device):
         args = self.args
         args.upper_length = upper_length
         args.stop_token = "eos" if upper_length == "eos" else None
@@ -50,7 +50,7 @@ class GPT2Generator(object):
         args.temperature = 0
         args.top_p = top_p
         args.top_k = 1
-        args.device = torch.cuda.current_device()
+        args.device = torch.cuda.current_device() if device == "gpu" else torch.cpu()
 
     def modify_p(self, top_p):
         self.args.top_p = top_p

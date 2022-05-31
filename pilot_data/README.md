@@ -6,6 +6,7 @@ This folder contains the dialogues used in the pilot study as well as the data c
 .
 ├── pilot_data                        # Includes all the data used, collected and analysis from the pilot study
 │   ├── plots                         # Some plots obtained from the data collected
+│   │   └── ...
 │   ├── inputs                        # Original dialogues used before the personality shaping
 │   ├── outputs_handcrafted           # The dialogues personalised according to literature
 │   ├── outputs_gpt3                  # The dialogues personalised by GPT-3 with one-shot learning
