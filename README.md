@@ -1,15 +1,10 @@
 # Personality and Emotions on Furhat
-This repo stores all the material of my master's thesis. Here I try to combine personality and emotional expression into the robot [Furhat](https://furhatrobotics.com/). The personality incorporation is done on the base of text on the belief that different personalities would speak using different words, etc. The emotional incorporation by extracting the emotions from the text the robot is saying and manifesting them through facial expressions.
+This repo stores all the material of my master's thesis. Here I try to combine personality and emotional expression into the robot [Furhat](https://furhatrobotics.com/). The personality incorporation is done on the base of text on the belief that people with different personalities would speak using different words, etc. The emotional incorporation is done by extracting the emotions from the text the robot is saying and are manifested through facial expressions.
 ## Repository structure
 ```bash
 .
+├── study_data                        # Includes all the data used, collected and analysis from the final study
 ├── pilot_data                        # Includes all the data used, collected and analysis from the pilot study
-│   ├── inputs                        # Original dialogues used before the personality shaping
-│   ├── outputs_handcrafted           # The dialogues personalised according to literature
-│   ├── outputs_gpt3                  # The dialogues personalised by GPT-3 with one-shot learning
-│   ├── outputs_strap                 # The dialogues personalised by STRAP
-│   ├── data.csv                      # Data collected from the pilot study
-│   └── basic_analysis.ipynb          # Some basic analysis of the data collected
 ├── style_trasnfer_paraphrase         # Contains the paraphrase model for personality style transfer
 │   ├── utils                         # Utilities + GAN-based model that has both personality classifier and generator
 │   │   ├── prepare_data.py           # Download and pre-process data (compatible with all models)
