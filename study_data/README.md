@@ -19,7 +19,7 @@ This folder contains the dialogues used in the pilot study as well as the data c
 ## Study questions
 The following are the questions used in the study with their ID.
 
-Personality questions, shown on a 7-point Likert scale:
+Personality questions, shown on a 7-point Likert scale with the prompt `I see myself (the speaker of the video) as someone who:`:
 1. is introverted  (not used when asked own personality)
 2. is reserved
 3. tends to be quiet
@@ -35,41 +35,53 @@ Personality questions, shown on a 7-point Likert scale:
 13. is coherent and consistent with what they say  (not used when asked own personality)
 14. click 'Strongly agree' for this question   (attention check)
 
-Godspeed questions, shown on a 5-point Likert scale:
-1. Anthropomorphism
-    1. Fake - Natural
-    2. Machinelike - Humanlike
-    3. Unconscious - Conscious
-    4. Artificial - Lifelike
-    5. Moving rigidly - Moving elegantly
-2. Likeability
-    1. Dislikable - Likable
-    2. Unfriendly - Friendly
-    3. Unkind - Kind
-    4. Unpleasant - Pleasant
-    5. Awful - Nice
-3. Perceived safety
-    1. Anxious - Relaxed
-    2. Calm - Agitated
-    3. Quiescent - Surprised
+Godspeed questions, shown on a 5-point Likert scale with the prompt `Please indicate the extent you think the robot is...`:
 
-RoSAS questions, shown on a 5-point Likert scale:
-1. Warmth
-    1. Happy
-    2. Feeling
-    3. Social
-    4. Organic
-    5. Compassionate
-    6. Emotional 
-2. Attention check
-    7. Click 'disagree' for this question
-3. Discomfort
-    8. Scary
-    9. Strange
-    10. Awkward
-    11. Dangerous
-    12. Awful
-    13. Aggressive
+ Anthropomorphism
+
+1. Fake - Natural
+2. Machinelike - Humanlike
+3. Unconscious - Conscious
+4. Artificial - Lifelike
+5. Moving rigidly - Moving elegantly
+
+ Likeability
+
+6. Dislikable - Likable
+7. Unfriendly - Friendly
+8. Unkind - Kind
+9. Unpleasant - Pleasant
+10. Awful - Nice
+
+ Perceived safety
+
+11. Anxious - Relaxed
+12. Calm - Agitated
+13. Quiescent - Surprised
+
+RoSAS questions, shown on a 5-point Likert scale with the prompt `I think the robot in the video is:`:
+
+ Warmth
+
+1. Happy
+2. Feeling
+3. Social
+4. Organic
+5. Compassionate
+6. Emotional 
+
+ Attention check
+
+7. Click 'disagree' for this question
+
+ Discomfort
+
+8. Scary
+9. Strange
+10. Awkward
+11. Dangerous
+12. Awful
+13. Aggressive
 
 ## Attention checks
 These are other attention checks used in the pilot study.

@@ -18,7 +18,7 @@ This folder contains the dialogues used in the pilot study as well as the data c
 
 ## Study questions
 The following are the questions used in the study with their ID.
-Questions were shown on a 7-point Likert scale.
+Questions were shown on a 7-point Likert scale with the prompt `I see the speaker as someone who...`.
 
 1. is introverted
 2. is reserved
