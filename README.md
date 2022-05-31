@@ -30,7 +30,7 @@ The specific requirements can be found in each subfolder. E.g. requirements for 
 ## Instructions for using STRAP personality transfer checkpoints
 Start by cloning this repo.
 ```bash
-git clone https://github.com/alessioGalatolo/https://github.com/alessioGalatolo/Furhat-Personality-and-Emotions
+git clone https://github.com/alessioGalatolo/Furhat-Personality-and-Emotions
 cd Furhat-Personality-and-Emotions
 ```
 Make sure pytorch (>1.9.0) is installed (see official documentation for the best way of doing this) in your working environment.
